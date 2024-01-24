@@ -1,5 +1,7 @@
 # lunar-tasks
 
+[![Codeship Status for drewkit/lunar-tasks](https://app.codeship.com/projects/58324a06-f4d1-427b-9139-c25b8237cf96/status?branch=master)](https://app.codeship.com/projects/466130)
+
 ### To Locally Run Elm App
 
 ```
