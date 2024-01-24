@@ -1,0 +1,67 @@
+<!DOCTYPE html>
+<head>
+  <meta charset="UTF-8">
+  <title>LunarTasks</title>
+  <link rel="stylesheet" href="css/main.css">
+  <link rel="stylesheet" href="css/elm-datepicker.css">
+  <script src="js/main.js"></script>
+  <link rel="icon" type="image/x-icon" href="images/favicon.ico">
+  <script src="js/js-sdk-0.15.2/dist/pocketbase.umd.js"></script>
+</head>
+
+<body>
+  <div id="lunar-task-app"></div>
+  <script type="text/javascript">
+    const pb = new PocketBase("https://lunartasks.com");
+
+    var app = Elm.Main.init({
+      node: document.getElementById("lunar-task-app"),
+      flags: [Date.now(), pb.authStore.isValid]
+    });
+
+    const login = () => {
+      if (pb.authStore.isValid) {
+        app.ports.userLoggedIn.send(pb.authStore.model);
+      } else {
+        pb.collection('users').authWithOAuth2({ provider: 'google' }).then(function(resp) {
+          pb.authStore.save(resp.token, resp.record);
+          app.ports.userLoggedIn.send(resp)
+        })
+      }
+    }
+
+    app.ports.fetchTasks.subscribe(function(data) {
+      pb.collection("tasks").getFullList().then(function(value) {
+        app.ports.loadTasks.send(value)
+      })
+    });
+
+    app.ports.loginUser.subscribe(function(data) {
+      login();
+    });
+
+    app.ports.createTask.subscribe(function(data) {
+        pb.collection("tasks").create(data).then(function(resp) {
+          app.ports.taskUpdated.send(resp);
+        });
+      });
+
+    app.ports.deleteTask.subscribe(function(data) {
+      pb.collection("tasks").delete(data).then(function(resp) {
+        app.ports.taskDeleted.send(data);
+      })
+    });
+
+    app.ports.updateTask.subscribe(function(data) {
+      pb.collection("tasks").update(data.id, data).then(function(resp) {
+        app.ports.taskUpdated.send(data);
+      })
+    });
+
+    app.ports.logOutUser.subscribe(function(data) {
+      pb.authStore.clear();
+    });
+
+  </script>
+</body>
+</html>

@@ -1,0 +1,32 @@
+#task-table-body > tr:hover
+{
+    background-color: lightgray;
+}
+
+#task-table-body > tr > td.embolden:hover
+{
+    text-shadow: 0px 0px 1px black;
+}
+
+table
+{
+    min-width: 100%;
+    border: 1px;
+    border: solid;
+    border-width: thin;
+    font-size: 22px;
+}
+
+table thead th
+{
+    text-align: center;
+    padding: 5px;
+}
+
+table tr td, table tr th
+{
+    border: 1px;
+    border: solid;
+    border-width: thin;
+    font-size: 22px;
+}
