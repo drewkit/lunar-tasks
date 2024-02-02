@@ -74,10 +74,7 @@ port deleteTask : String -> Cmd msg
 port taskDeleted : (String -> msg) -> Sub msg
 
 
-port logOutUser : Int -> Cmd msg
-
-
-port loginUser : Int -> Cmd msg
+port userLoginAction : String -> Cmd msg
 
 
 port userLoggedIn : (Decode.Value -> msg) -> Sub msg
@@ -197,7 +194,7 @@ init currentTimeinMillis validAuth =
     let
         loginCmd =
             if validAuth then
-                loginUser 0
+                userLoginAction "login"
 
             else
                 Cmd.none
@@ -573,7 +570,7 @@ update msg model =
                     ( { model | banner = Decode.errorToString err }, Cmd.none )
 
         LogOutUser _ ->
-            ( model |> resetLogin, logOutUser 0 )
+            ( model |> resetLogin, userLoginAction "logout" )
 
         DemoLoginUser _ ->
             ( { model
@@ -604,7 +601,7 @@ update msg model =
                     ( model, Cmd.none )
 
         LoginUser _ ->
-            ( model, loginUser 0 )
+            ( model, userLoginAction "login" )
 
         UserLoggedIn jsonResp ->
             case Decode.decodeValue taskOwnerDecoder jsonResp of

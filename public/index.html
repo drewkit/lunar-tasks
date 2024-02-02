@@ -36,8 +36,12 @@
       })
     });
 
-    app.ports.loginUser.subscribe(function(data) {
-      login();
+    app.ports.userLoginAction.subscribe(function(data) {
+      if (data === "login") {
+        login();
+      } else if (data === "logout") {
+        pb.authStore.clear();
+      };
     });
 
     app.ports.createTask.subscribe(function(data) {
@@ -57,11 +61,6 @@
         app.ports.taskUpdated.send(data);
       })
     });
-
-    app.ports.logOutUser.subscribe(function(data) {
-      pb.authStore.clear();
-    });
-
   </script>
 </body>
 </html>
