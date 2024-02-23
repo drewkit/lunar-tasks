@@ -30,12 +30,6 @@
       }
     }
 
-    app.ports.fetchTasks.subscribe(function(data) {
-      pb.collection("tasks").getFullList().then(function(value) {
-        app.ports.loadTasks.send(value)
-      })
-    });
-
     app.ports.userLoginAction.subscribe(function(data) {
       if (data === "login") {
         login();
@@ -44,23 +38,30 @@
       };
     });
 
-    app.ports.createTask.subscribe(function(data) {
-        pb.collection("tasks").create(data).then(function(resp) {
-          app.ports.taskUpdated.send(resp);
-        });
-      });
+    app.ports.taskAction.subscribe(function(args) {
+      var [action, task] = args
+      if (action == "create") {
+        pb.collection("tasks").create(task).then(function(createdTask) {
+          app.ports.taskUpdated.send(createdTask);
+        })
+      } else if (action == "update") {
+        pb.collection("tasks").update(task.id, task).then(function(updatedTask) {
+          app.ports.taskUpdated.send(updatedTask);
+        })
+      } else if (action == "delete") {
+        pb.collection("tasks").delete(task.id).then(function() {
+          app.ports.taskDeleted.send(task.id);
+        })
+      } else if (action == "fetch") {
+        pb.collection("tasks").getFullList().then(function(collection) {
+          app.ports.loadTasks.send(collection)
+        })
+      } else {
+        console.log("task action unrecognized: ", action)
+      }
+    })
 
-    app.ports.deleteTask.subscribe(function(data) {
-      pb.collection("tasks").delete(data).then(function(resp) {
-        app.ports.taskDeleted.send(data);
-      })
-    });
 
-    app.ports.updateTask.subscribe(function(data) {
-      pb.collection("tasks").update(data.id, data).then(function(resp) {
-        app.ports.taskUpdated.send(data);
-      })
-    });
   </script>
 </body>
 </html>

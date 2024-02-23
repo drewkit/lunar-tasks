@@ -59,16 +59,10 @@ subscriptions _ =
 -- PORTS
 
 
-port createTask : Encode.Value -> Cmd msg
-
-
-port updateTask : Encode.Value -> Cmd msg
+port taskAction : ( String, Encode.Value ) -> Cmd msg
 
 
 port taskUpdated : (Decode.Value -> msg) -> Sub msg
-
-
-port deleteTask : String -> Cmd msg
 
 
 port taskDeleted : (String -> msg) -> Sub msg
@@ -78,9 +72,6 @@ port userLoginAction : String -> Cmd msg
 
 
 port userLoggedIn : (Decode.Value -> msg) -> Sub msg
-
-
-port fetchTasks : Int -> Cmd msg
 
 
 port loadTasks : (Decode.Value -> msg) -> Sub msg
@@ -272,7 +263,7 @@ type Msg
     | EditTaskCancel
     | EditTaskSave
     | EditTask String
-    | DeleteTask String
+    | DeleteTask LunarTask
     | ProcessDownKeys Keyboard.RawKey
     | ReceivedCurrentDate Date
     | TaskUpdated Decode.Value
@@ -288,6 +279,19 @@ type Msg
 
 update : Msg -> Model -> ( Model, Cmd Msg )
 update msg model =
+    let
+        createTask task =
+            taskAction ( "create", task )
+
+        updateTask task =
+            taskAction ( "update", task )
+
+        deleteTask task =
+            taskAction ( "delete", task )
+
+        fetchTasks =
+            taskAction ( "fetch", Encode.null )
+    in
     case msg of
         SelectTag maybeTagName ->
             ( model |> selectTag maybeTagName, Cmd.none )
@@ -499,12 +503,12 @@ update msg model =
                 Nothing ->
                     ( model, Cmd.none )
 
-        DeleteTask taskId ->
+        DeleteTask task ->
             if model.demo then
-                update (TaskDeleted taskId) model
+                update (TaskDeleted task.id) model
 
             else
-                ( model, deleteTask taskId )
+                ( model, deleteTask (lunarTaskEncoder task) )
 
         NewTaskSetDatePicker subMsg ->
             let
@@ -610,7 +614,7 @@ update msg model =
                         | taskOwner = taskOwnerId
                         , view = LoadingTasksView
                       }
-                    , fetchTasks 0
+                    , fetchTasks
                     )
 
                 Err errMsg ->
@@ -1188,7 +1192,7 @@ viewTaskTable currentDate tasks =
                             [ Html.Attributes.style "cursor" "pointer"
                             , Html.Attributes.style "text-align" "center"
                             , Html.Attributes.class "embolden"
-                            , Html.Events.onClick (DeleteTask task.id)
+                            , Html.Events.onClick (DeleteTask task)
                             ]
                             [ Html.text "Remove" ]
                         ]
