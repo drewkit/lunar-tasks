@@ -21,11 +21,11 @@
 
     const login = () => {
       if (pb.authStore.isValid) {
-        app.ports.userLoggedIn.send(pb.authStore.model);
+        app.ports.messageReceiver.send({tag: "userLoggedIn", payload: pb.authStore.model});
       } else {
         pb.collection('users').authWithOAuth2({ provider: 'google' }).then(function(resp) {
           pb.authStore.save(resp.token, resp.record);
-          app.ports.userLoggedIn.send(resp)
+          app.ports.messageReceiver.send({tag: "userLoggedIn", payload: resp});
         })
       }
     }
@@ -42,19 +42,19 @@
       var [action, task] = args
       if (action == "create") {
         pb.collection("tasks").create(task).then(function(createdTask) {
-          app.ports.taskUpdated.send(createdTask);
+          app.ports.messageReceiver.send({tag: "taskCreated", payload: createdTask});
         })
       } else if (action == "update") {
         pb.collection("tasks").update(task.id, task).then(function(updatedTask) {
-          app.ports.taskUpdated.send(updatedTask);
+          app.ports.messageReceiver.send({tag: "taskUpdated", payload: updatedTask});
         })
       } else if (action == "delete") {
         pb.collection("tasks").delete(task.id).then(function() {
-          app.ports.taskDeleted.send(task.id);
+          app.ports.messageReceiver.send({tag: "taskDeleted", payload: task});
         })
       } else if (action == "fetch") {
         pb.collection("tasks").getFullList().then(function(collection) {
-          app.ports.loadTasks.send(collection)
+          app.ports.messageReceiver.send({tag: "tasksFetched", payload: collection})
         })
       } else {
         console.log("task action unrecognized: ", action)
