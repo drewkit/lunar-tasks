@@ -47,10 +47,7 @@ main =
 subscriptions : Model -> Sub Msg
 subscriptions _ =
     Sub.batch
-        [ taskUpdated TaskUpdated
-        , taskDeleted TaskDeleted
-        , loadTasks LoadTasks
-        , userLoggedIn UserLoggedIn
+        [ messageReceiver Recv
         , Keyboard.downs ProcessDownKeys
         ]
 
@@ -59,34 +56,13 @@ subscriptions _ =
 -- PORTS
 
 
-port createTask : Encode.Value -> Cmd msg
+port taskAction : ( String, Encode.Value ) -> Cmd msg
 
 
-port updateTask : Encode.Value -> Cmd msg
+port messageReceiver : ({ tag : String, payload : Decode.Value } -> msg) -> Sub msg
 
 
-port taskUpdated : (Decode.Value -> msg) -> Sub msg
-
-
-port deleteTask : String -> Cmd msg
-
-
-port taskDeleted : (String -> msg) -> Sub msg
-
-
-port logOutUser : Int -> Cmd msg
-
-
-port loginUser : Int -> Cmd msg
-
-
-port userLoggedIn : (Decode.Value -> msg) -> Sub msg
-
-
-port fetchTasks : Int -> Cmd msg
-
-
-port loadTasks : (Decode.Value -> msg) -> Sub msg
+port userLoginAction : String -> Cmd msg
 
 
 
@@ -197,7 +173,7 @@ init currentTimeinMillis validAuth =
     let
         loginCmd =
             if validAuth then
-                loginUser 0
+                userLoginAction "login"
 
             else
                 Cmd.none
@@ -252,7 +228,8 @@ init currentTimeinMillis validAuth =
 
 
 type Msg
-    = SelectTag (Maybe String)
+    = Recv { tag : String, payload : Decode.Value }
+    | SelectTag (Maybe String)
     | Search String
     | ClearSearch
     | ClearBanner
@@ -275,11 +252,11 @@ type Msg
     | EditTaskCancel
     | EditTaskSave
     | EditTask String
-    | DeleteTask String
+    | DeleteTask LunarTask
     | ProcessDownKeys Keyboard.RawKey
     | ReceivedCurrentDate Date
     | TaskUpdated Decode.Value
-    | TaskDeleted String
+    | TaskDeleted Decode.Value
     | LogOutUser Int
     | LoadTasks Decode.Value
     | LoginUser Int
@@ -291,7 +268,40 @@ type Msg
 
 update : Msg -> Model -> ( Model, Cmd Msg )
 update msg model =
+    let
+        createTask encodedTask =
+            taskAction ( "create", encodedTask )
+
+        updateTask encodedTask =
+            taskAction ( "update", encodedTask )
+
+        deleteTask encodedTask =
+            taskAction ( "delete", encodedTask )
+
+        fetchTasks =
+            taskAction ( "fetch", Encode.null )
+    in
     case msg of
+        Recv data ->
+            case data.tag of
+                "userLoggedIn" ->
+                    update (UserLoggedIn data.payload) model
+
+                "taskCreated" ->
+                    update (TaskUpdated data.payload) model
+
+                "taskUpdated" ->
+                    update (TaskUpdated data.payload) model
+
+                "taskDeleted" ->
+                    update (TaskDeleted data.payload) model
+
+                "tasksFetched" ->
+                    update (LoadTasks data.payload) model
+
+                _ ->
+                    update (LoadTasks Encode.null) model
+
         SelectTag maybeTagName ->
             ( model |> selectTag maybeTagName, Cmd.none )
 
@@ -502,12 +512,16 @@ update msg model =
                 Nothing ->
                     ( model, Cmd.none )
 
-        DeleteTask taskId ->
+        DeleteTask task ->
+            let
+                encodedLunarTask =
+                    lunarTaskEncoder task
+            in
             if model.demo then
-                update (TaskDeleted taskId) model
+                update (TaskDeleted encodedLunarTask) model
 
             else
-                ( model, deleteTask taskId )
+                ( model, deleteTask encodedLunarTask )
 
         NewTaskSetDatePicker subMsg ->
             let
@@ -533,8 +547,13 @@ update msg model =
         ReceivedCurrentDate date ->
             ( { model | currentDate = date }, Cmd.none )
 
-        TaskDeleted taskId ->
-            ( { model | tasks = deleteTaskFromList taskId model.tasks }, Cmd.none )
+        TaskDeleted jsonTask ->
+            case Decode.decodeValue lunarTaskDecoder jsonTask of
+                Ok task ->
+                    ( { model | tasks = deleteTaskFromList task.id model.tasks }, Cmd.none )
+
+                Err err ->
+                    ( { model | banner = Decode.errorToString err }, Cmd.none )
 
         TaskUpdated jsonTask ->
             let
@@ -573,7 +592,7 @@ update msg model =
                     ( { model | banner = Decode.errorToString err }, Cmd.none )
 
         LogOutUser _ ->
-            ( model |> resetLogin, logOutUser 0 )
+            ( model |> resetLogin, userLoginAction "logout" )
 
         DemoLoginUser _ ->
             ( { model
@@ -604,7 +623,7 @@ update msg model =
                     ( model, Cmd.none )
 
         LoginUser _ ->
-            ( model, loginUser 0 )
+            ( model, userLoginAction "login" )
 
         UserLoggedIn jsonResp ->
             case Decode.decodeValue taskOwnerDecoder jsonResp of
@@ -613,7 +632,7 @@ update msg model =
                         | taskOwner = taskOwnerId
                         , view = LoadingTasksView
                       }
-                    , fetchTasks 0
+                    , fetchTasks
                     )
 
                 Err errMsg ->
@@ -1191,7 +1210,7 @@ viewTaskTable currentDate tasks =
                             [ Html.Attributes.style "cursor" "pointer"
                             , Html.Attributes.style "text-align" "center"
                             , Html.Attributes.class "embolden"
-                            , Html.Events.onClick (DeleteTask task.id)
+                            , Html.Events.onClick (DeleteTask task)
                             ]
                             [ Html.text "Remove" ]
                         ]
