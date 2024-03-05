@@ -369,6 +369,7 @@ update msg model =
                             , completionEntries = []
                             , id = "asdfasdf"
                             , tag = Nothing
+                            , bitTags = 0
                             , taskOwner = "alksdjflasd"
                             }
 
@@ -616,11 +617,11 @@ update msg model =
                             , Cmd.none
                             )
 
-                        Err _ ->
-                            ( model, Cmd.none )
+                        Err errMsg ->
+                            ( { model | banner = Decode.errorToString errMsg }, Cmd.none )
 
                 Err _ ->
-                    ( model, Cmd.none )
+                    ( { model | banner = "LoadDemo Http.Error" }, Cmd.none )
 
         LoginUser _ ->
             ( model, userLoginAction "login" )

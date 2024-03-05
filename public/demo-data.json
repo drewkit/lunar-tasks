@@ -5,6 +5,7 @@
       "title": "haircut",
       "period": 25,
       "tag": "",
+      "bitTags": 1,
       "completionEntries": [
         {
           "year": 2023,
@@ -26,6 +27,7 @@
       "title": "wash bath rugs",
       "period": 60,
       "tag": "laundry",
+      "bitTags": 3,
       "completionEntries": [
         {
           "year": 2023,
@@ -43,6 +45,7 @@
       "title": "liquid fertilizer run on plants",
       "period": 300,
       "tag": "landscaping",
+      "bitTags": 5,
       "completionEntries": [
         {
           "year": 2023,
@@ -60,6 +63,7 @@
       "title": "summertime spray of ac unit",
       "period": 20,
       "tag": "landscaping",
+      "bitTags": 3,
       "completionEntries": [
         {
           "year": 2023,
@@ -76,6 +80,7 @@
       "id": "hovk3hblp5f7u7u",
       "title": "house sweep with linter",
       "period": 30,
+      "bitTags": 0,
       "tag": "",
       "completionEntries": [
         {
@@ -90,6 +95,7 @@
       "title": "clean out bathroom duct fan",
       "period": 300,
       "tag": "",
+      "bitTags": 0,
       "completionEntries": [
         {
           "year": 2022,
@@ -103,6 +109,7 @@
       "title": "clean out gutters",
       "period": 200,
       "tag": "landscaping",
+      "bitTags": 0,
       "completionEntries": [
         {
           "year": 2023,
@@ -116,6 +123,7 @@
       "title": "Scrub shower/bath/glass porcelain",
       "period": 200,
       "tag": "",
+      "bitTags": 5,
       "completionEntries": [
         {
           "year": 2023,
@@ -129,6 +137,7 @@
       "title": "Service Roomba",
       "period": 200,
       "tag": "",
+      "bitTags": 5,
       "completionEntries": [
         {
           "year": 2023,
@@ -142,6 +151,7 @@
       "title": "Dryer Vent Cleaning",
       "period": 312,
       "tag": "landscaping",
+      "bitTags": 2,
       "completionEntries": [
         {
           "year": 2021,
@@ -155,6 +165,7 @@
       "title": "purging of fridge and freezer",
       "period": 180,
       "tag": "trash-grab",
+      "bitTags": 2,
       "completionEntries": [
         {
           "year": 2023,
@@ -168,6 +179,7 @@
       "title": "mow lawn",
       "period": 12,
       "tag": "landscaping",
+      "bitTags": 0,
       "completionEntries": [
         {
           "year": 2023,
@@ -185,6 +197,7 @@
       "title": "Test CO/fire detectors",
       "period": 150,
       "tag": "",
+      "bitTags": 0,
       "completionEntries": [
         {
           "year": 2023,
@@ -198,6 +211,7 @@
       "title": "wipe window sills",
       "period": 180,
       "tag": "",
+      "bitTags": 5,
       "completionEntries": [
         {
           "year": 2023,
@@ -211,6 +225,7 @@
       "title": "pull weeds from yard",
       "period": 30,
       "tag": "landscaping",
+      "bitTags": 0,
       "completionEntries": [
         {
           "year": 2023,
@@ -232,6 +247,7 @@
       "title": "scrub toilet bowls",
       "period": 15,
       "tag": "",
+      "bitTags": 0,
       "completionEntries": [
         {
           "year": 2023,
@@ -249,6 +265,7 @@
       "title": "drain washer plug",
       "period": 60,
       "tag": "laundry",
+      "bitTags": 0,
       "completionEntries": [
         {
           "year": 2023,
@@ -266,6 +283,7 @@
       "title": "clean mattress protectors",
       "period": 365,
       "tag": "laundry",
+      "bitTags": 0,
       "completionEntries": [
         {
           "year": 2023,
@@ -279,6 +297,7 @@
       "title": "clear out lint bin from laundry room",
       "period": 300,
       "tag": "trash-grab",
+      "bitTags": 2,
       "completionEntries": [
         {
           "year": 2023,
@@ -292,6 +311,7 @@
       "title": "Clean Desktop of Screenshots/etc",
       "period": 200,
       "tag": "digital-hygiene",
+      "bitTags": 0,
       "completionEntries": [
         {
           "year": 2023,
@@ -305,6 +325,7 @@
       "title": "have arborist go over property",
       "period": 500,
       "tag": "",
+      "bitTags": 0,
       "completionEntries": [
         {
           "year": 2021,
@@ -318,6 +339,7 @@
       "title": "spray garage door springs",
       "period": 40,
       "tag": "",
+      "bitTags": 0,
       "completionEntries": [
         {
           "year": 2023,
