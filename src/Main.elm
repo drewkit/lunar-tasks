@@ -1,5 +1,6 @@
 port module Main exposing (..)
 
+import BitFlags exposing (BitFlagSettings)
 import Browser
 import Date exposing (Date, Unit(..))
 import DatePicker exposing (defaultSettings)
@@ -85,6 +86,7 @@ type alias Model =
     , newTaskCompletedAt : Date.Date
     , banner : String
     , editedTask : Maybe LunarTask
+    , tagSettings : BitFlagSettings
     , demo : Bool
     , demoId : Int
     , datePicker : DatePicker.DatePicker
@@ -135,12 +137,19 @@ type alias LoginAttributes r =
         , taskOwner : String
         , view : ViewType
         , demo : Bool
+        , tagSettings : BitFlagSettings
     }
 
 
 resetLogin : LoginAttributes r -> LoginAttributes r
 resetLogin attrs =
-    { attrs | tasks = [], demo = False, taskOwner = "", view = LoginPrompt }
+    { attrs
+        | tasks = []
+        , demo = False
+        , taskOwner = ""
+        , view = LoginPrompt
+        , tagSettings = BitFlags.defaultSettings
+    }
 
 
 datePickerSettings : DatePicker.Settings
@@ -200,6 +209,7 @@ init currentTimeinMillis validAuth =
             , filter = FilterAll
             , sort = NoSort DESC
             , tagSelected = Nothing
+            , tagSettings = BitFlags.defaultSettings
             , searchTerm = Nothing
             , datePicker = newDatePicker
             , view = loadingOrLoginView
@@ -596,10 +606,24 @@ update msg model =
             ( model |> resetLogin, userLoginAction "logout" )
 
         DemoLoginUser _ ->
+            let
+                flagSettingsResult =
+                    BitFlags.initSettings
+                        { bitLimit = 20
+                        , flags =
+                            [ "trash-grab"
+                            , "laundry"
+                            , "landscaping"
+                            , "digital-hygiene"
+                            ]
+                        }
+            in
             ( { model
                 | view = LoadingTasksView
                 , demo = True
                 , taskOwner = "demoTaskOwnerId"
+                , tagSettings =
+                    Result.withDefault BitFlags.defaultSettings flagSettingsResult
               }
             , Http.get { url = "/demo-data.json", expect = Http.expectString LoadDemo }
             )
