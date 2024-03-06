@@ -1181,12 +1181,9 @@ viewTaskDiscovery model =
 
         displayResetOption : Bool
         displayResetOption =
-            model.filter
-                == FilterAll
-                && model.sort
-                == NoSort DESC
-                && model.searchTerm
-                == Nothing
+            (model.filter == FilterAll)
+                && (model.sort == NoSort DESC)
+                && (model.searchTerm == Nothing)
                 && Set.isEmpty (Tuple.first model.tagsSelected)
                 && Set.isEmpty (Tuple.second model.tagsSelected)
 
@@ -1312,15 +1309,6 @@ viewTaskTable currentDate tasks =
                         , td []
                             [ Html.text <| Date.toIsoString (getLastCompletedAt task) ]
                         , td [] [ Html.text <| String.fromInt (getDaysPastDue currentDate task) ]
-
-                        -- Debug.todo
-                        -- , td
-                        --     [ Html.Events.onClick (ToggleTag task.tag)
-                        --     , Html.Attributes.class "embolden"
-                        --     ]
-                        --     [ Html.span [ Html.Attributes.style "cursor" "pointer" ]
-                        --         [ Html.text <| Maybe.withDefault "" task.tag ]
-                        --     ]
                         , td
                             [ Html.Attributes.style "cursor" "pointer"
                             , Html.Attributes.style "text-align" "center"
