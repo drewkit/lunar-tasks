@@ -971,7 +971,8 @@ viewTask model =
                     , placeholder = Nothing
                     }
                 , column []
-                    [ SearchBox.input []
+                    [ el [ Font.bold ] (text "Tags")
+                    , SearchBox.input []
                         { onChange = EditTaskChangedTagSearchBox
                         , text = model.tagSearchBoxText
                         , filter =
@@ -980,7 +981,7 @@ viewTask model =
                         , selected = model.tagSearchBoxSelected
                         , placeholder = Nothing
                         , state = model.tagSearchBox
-                        , label = Input.labelAbove [] (text "Tags")
+                        , label = Input.labelHidden "tag selection"
                         , toLabel =
                             \str -> str
                         , options =
@@ -1350,7 +1351,6 @@ viewTaskTable currentDate tasks =
                         , th []
                             [ Html.text "Last Completed" ]
                         , th [] [ Html.text "Days Past Due" ]
-                        , th [] [ Html.text "Category" ]
                         , th [] [ Html.text "Mark Completed" ]
                         , th [] [ Html.text "Remove" ]
                         ]
