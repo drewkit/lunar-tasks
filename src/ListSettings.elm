@@ -70,7 +70,7 @@ toggleTag tag listSettings =
     in
     case ( whitelistMember, blacklistMember ) of
         ( False, False ) ->
-            { listSettings | tagsSelected = ( Set.remove tag whitelistTags, blacklistTags ) }
+            { listSettings | tagsSelected = ( Set.insert tag whitelistTags, blacklistTags ) }
 
         ( True, False ) ->
             { listSettings | tagsSelected = ( Set.remove tag whitelistTags, Set.insert tag blacklistTags ) }
