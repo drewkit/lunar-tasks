@@ -22,6 +22,7 @@ import ListSettings exposing (..)
 import LunarTask exposing (..)
 import NewLunarTask exposing (..)
 import Process
+import SearchBox
 import Set exposing (Set)
 import Task
 import Time exposing (utc)
@@ -89,6 +90,9 @@ type alias Model =
     , demo : Bool
     , demoId : Int
     , datePicker : DatePicker.DatePicker
+    , tagSearchBox : SearchBox.State
+    , tagSearchBoxText : String
+    , tagSearchBoxSelected : Maybe String
     }
 
 
@@ -215,6 +219,9 @@ init currentTimeinMillis validAuth =
             , editedTask = Nothing
             , demo = False
             , demoId = 0
+            , tagSearchBox = SearchBox.init
+            , tagSearchBoxText = ""
+            , tagSearchBoxSelected = Nothing
             }
     in
     ( model
@@ -257,6 +264,7 @@ type Msg
     | EditTaskCancel
     | EditTaskSave
     | EditTask String
+    | EditTaskChangedTagSearchBox (SearchBox.ChangeEvent String)
     | DeleteTask LunarTask
     | ProcessDownKeys Keyboard.RawKey
     | ReceivedCurrentDate Date
@@ -524,6 +532,36 @@ update msg model =
 
                 Nothing ->
                     ( model, Cmd.none )
+
+        EditTaskChangedTagSearchBox changeEvent ->
+            case changeEvent of
+                SearchBox.SelectionChanged tag ->
+                    case model.editedTask of
+                        Just task ->
+                            ( { model
+                                | editedTask = Just { task | bitTags = BitFlags.enableFlag model.tagSettings tag task.bitTags }
+                              }
+                            , Cmd.none
+                            )
+
+                        Nothing ->
+                            ( model, Cmd.none )
+
+                SearchBox.TextChanged text ->
+                    ( { model
+                        | tagSearchBoxSelected = Nothing
+                        , tagSearchBoxText = text
+                        , tagSearchBox = SearchBox.reset model.tagSearchBox
+                      }
+                    , Cmd.none
+                    )
+
+                SearchBox.SearchBoxChanged subMsg ->
+                    ( { model
+                        | tagSearchBox = SearchBox.update subMsg model.tagSearchBox
+                      }
+                    , Cmd.none
+                    )
 
         DeleteTask task ->
             let
@@ -933,12 +971,24 @@ viewTask model =
                     , placeholder = Nothing
                     }
                 , column []
-                    [ el [ Font.bold ] (text "Tags")
-                    , Input.text []
-                        { label = Input.labelHidden "Tag"
-                        , onChange = EditTaskEnableTag
-                        , text = ""
+                    [ SearchBox.input []
+                        { onChange = EditTaskChangedTagSearchBox
+                        , text = model.tagSearchBoxText
+                        , filter =
+                            \query optionStr ->
+                                String.contains query optionStr
+                        , selected = model.tagSearchBoxSelected
                         , placeholder = Nothing
+                        , state = model.tagSearchBox
+                        , label = Input.labelAbove [] (text "Tags")
+                        , toLabel =
+                            \str -> str
+                        , options =
+                            Just <|
+                                Set.toList <|
+                                    Set.diff
+                                        (Set.fromList <| BitFlags.allFlags model.tagSettings)
+                                        (Set.fromList <| BitFlags.enabledFlags model.tagSettings task.bitTags)
                         }
                     , Element.column [ spacingXY 0 15, paddingXY 0 15 ] (viewEnabledTasks task model)
                     ]

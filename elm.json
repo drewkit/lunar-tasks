@@ -17,7 +17,8 @@
             "feathericons/elm-feather": "1.5.0",
             "justinmimbs/date": "3.2.1",
             "mdgriffith/elm-ui": "1.1.8",
-            "ohanhi/keyboard": "2.0.1"
+            "ohanhi/keyboard": "2.0.1",
+            "russelldavies/elm-ui-searchbox": "1.1.1"
         },
         "indirect": {
             "elm/bytes": "1.0.8",
