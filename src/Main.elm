@@ -1179,17 +1179,20 @@ viewTaskDiscovery model =
                 , label = Icon.x |> Icon.toHtml [] |> Element.html
                 }
 
+        displayResetOption : Bool
+        displayResetOption =
+            model.filter
+                == FilterAll
+                && model.sort
+                == NoSort DESC
+                && model.searchTerm
+                == Nothing
+                && Set.isEmpty (Tuple.first model.tagsSelected)
+                && Set.isEmpty (Tuple.second model.tagsSelected)
+
         resetOption =
             button
-                [ transparent
-                    (model.filter
-                        == FilterAll
-                        && model.sort
-                        == NoSort DESC
-                        && model.searchTerm
-                        == Nothing
-                    )
-                ]
+                [ transparent displayResetOption ]
                 { label = text "(x) reset all selections", onPress = Just FilterReset }
 
         getTagState : String -> TagToggleState
