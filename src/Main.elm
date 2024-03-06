@@ -8,7 +8,7 @@ import Element exposing (..)
 import Element.Background as Background
 import Element.Border as Border
 import Element.Font as Font
-import Element.Input as Input exposing (button)
+import Element.Input as Input exposing (OptionState(..), button)
 import FeatherIcons as Icon exposing (Icon)
 import Html exposing (Html, td, th, tr)
 import Html.Attributes exposing (style)
@@ -22,7 +22,7 @@ import ListSettings exposing (..)
 import LunarTask exposing (..)
 import NewLunarTask exposing (..)
 import Process
-import Set
+import Set exposing (Set)
 import Task
 import Time exposing (utc)
 
@@ -74,10 +74,9 @@ type alias Model =
     { tasks : List LunarTask
     , taskOwner : String
     , currentDate : Date.Date
-    , allTags : Set.Set String
     , filter : ListFilter
     , sort : ListSort
-    , tagSelected : Maybe String
+    , tagsSelected : ( Set String, Set String )
     , searchTerm : Maybe String
     , view : ViewType
     , newTaskTitle : String
@@ -168,13 +167,9 @@ datePickerSettings =
 -- INIT
 
 
-currentTags : List LunarTask -> Set.Set String
-currentTags tasks =
-    List.map .tag tasks
-        |> List.map (Maybe.withDefault "")
-        |> List.map String.trim
-        |> List.filter (\n -> not (String.isEmpty n))
-        |> Set.fromList
+currentTags : BitFlagSettings -> List String
+currentTags settings =
+    BitFlags.allFlags settings
 
 
 init : Int -> Bool -> ( Model, Cmd Msg )
@@ -205,10 +200,9 @@ init currentTimeinMillis validAuth =
             { tasks = []
             , taskOwner = ""
             , currentDate = currentDate
-            , allTags = currentTags []
             , filter = FilterAll
             , sort = NoSort DESC
-            , tagSelected = Nothing
+            , tagsSelected = ( Set.fromList [], Set.fromList [] )
             , tagSettings = BitFlags.defaultSettings
             , searchTerm = Nothing
             , datePicker = newDatePicker
@@ -239,7 +233,7 @@ init currentTimeinMillis validAuth =
 
 type Msg
     = Recv { tag : String, payload : Decode.Value }
-    | SelectTag (Maybe String)
+    | ToggleTag String
     | Search String
     | ClearSearch
     | ClearBanner
@@ -255,7 +249,7 @@ type Msg
     | NewTaskUpdateTag String
     | NewTaskSetDatePicker DatePicker.Msg
     | EditTaskPeriod String
-    | EditTaskTag String
+    | EditTaskTagToggle String
     | EditTaskTitle String
     | EditTaskRemoveCompletionEntry Date.Date
     | EditTaskAddCompletionEntry DatePicker.Msg
@@ -312,8 +306,8 @@ update msg model =
                 _ ->
                     update (LoadTasks Encode.null) model
 
-        SelectTag maybeTagName ->
-            ( model |> selectTag maybeTagName, Cmd.none )
+        ToggleTag tag ->
+            ( model |> toggleTag tag, Cmd.none )
 
         SelectFilter filter ->
             ( model |> selectFilter filter, Cmd.none )
@@ -378,7 +372,6 @@ update msg model =
                             , period = 20
                             , completionEntries = []
                             , id = "asdfasdf"
-                            , tag = Nothing
                             , bitTags = 0
                             , taskOwner = "alksdjflasd"
                             }
@@ -487,18 +480,14 @@ update msg model =
             in
             ( { model | newTaskTag = tag }, Cmd.none )
 
-        EditTaskTag stringTag ->
+        EditTaskTagToggle tag ->
             let
-                tag =
-                    if String.trim stringTag == "" then
-                        Nothing
-
-                    else
-                        Just stringTag
+                toggleTag =
+                    BitFlags.enableFlag model.tagSettings tag
             in
             case model.editedTask of
                 Just task ->
-                    ( { model | editedTask = Just { task | tag = tag } }, Cmd.none )
+                    ( { model | editedTask = Just { task | bitTags = toggleTag task.bitTags } }, Cmd.none )
 
                 Nothing ->
                     ( model, Cmd.none )
@@ -589,7 +578,6 @@ update msg model =
                       { model
                         | banner = "task \"" ++ task.title ++ "\" -- id  " ++ task.id ++ " touched by db"
                         , tasks = tasks
-                        , allTags = currentTags tasks
                       }
                     , Cmd.batch
                         [ delay 5000 ClearBanner
@@ -636,7 +624,6 @@ update msg model =
                             ( { model
                                 | view = LoadedTasksView
                                 , tasks = tasks
-                                , allTags = currentTags tasks
                               }
                             , Cmd.none
                             )
@@ -683,7 +670,6 @@ update msg model =
                     ( { model
                         | tasks = tasks
                         , view = LoadedTasksView
-                        , allTags = currentTags tasks
                       }
                     , Cmd.none
                     )
@@ -933,12 +919,14 @@ viewTask model =
                     , text = String.fromInt task.period
                     , placeholder = Nothing
                     }
-                , Input.text []
-                    { label = Input.labelAbove [ Font.semiBold ] (text "Category")
-                    , onChange = EditTaskTag
-                    , text = Maybe.withDefault "" task.tag
-                    , placeholder = Nothing
-                    }
+
+                -- Debug.todo
+                -- , Input.text []
+                --     { label = Input.labelAbove [ Font.semiBold ] (text "Category")
+                --     , onChange = EditTaskTagToggle
+                --     , text = Maybe.withDefault "" task.tag
+                --     , placeholder = Nothing
+                --     }
                 , column []
                     [ el [ Font.bold ] (text "Completion Entries")
                     , el [ Border.width 1, paddingXY 10 10, Border.color color.lightGrey ] <|
@@ -1120,6 +1108,21 @@ viewTaskDiscovery model =
                     )
                 ]
                 { label = text "(x) reset all selections", onPress = Just FilterReset }
+
+        getTagState : String -> TagState
+        getTagState tag =
+            let
+                ( whitelistedTags, blacklistedTags ) =
+                    model.tagsSelected
+            in
+            if Set.member tag whitelistedTags then
+                Whitelisted
+
+            else if Set.member tag blacklistedTags then
+                Blacklisted
+
+            else
+                Unselected
     in
     column [ spacingXY 0 15 ]
         [ filterRow
@@ -1129,8 +1132,8 @@ viewTaskDiscovery model =
             , clearSearchBtn
             ]
         , wrappedRow [ spacingXY 10 5 ]
-            (List.map (viewTagButton (Maybe.withDefault "" model.tagSelected))
-                (Set.toList model.allTags)
+            (List.map (\t -> viewTagButton (getTagState t) t)
+                (BitFlags.allFlags model.tagSettings)
             )
         , resetOption
         ]
@@ -1139,9 +1142,15 @@ viewTaskDiscovery model =
 viewMain : Model -> Element Msg
 viewMain model =
     let
+        whitelistedTags =
+            Tuple.first model.tagsSelected
+
+        blacklistedTags =
+            Tuple.second model.tagsSelected
+
         tasks =
             model.tasks
-                |> filterByTag model.tagSelected
+                |> filterByTags (BitFlags.match model.tagSettings (Set.toList whitelistedTags) (Set.toList blacklistedTags))
                 |> filterTaskList model.filter model.currentDate
                 |> filterByTerm model.searchTerm
                 |> sortTaskList model.sort model.currentDate
@@ -1217,13 +1226,15 @@ viewTaskTable currentDate tasks =
                         , td []
                             [ Html.text <| Date.toIsoString (getLastCompletedAt task) ]
                         , td [] [ Html.text <| String.fromInt (getDaysPastDue currentDate task) ]
-                        , td
-                            [ Html.Events.onClick (SelectTag task.tag)
-                            , Html.Attributes.class "embolden"
-                            ]
-                            [ Html.span [ Html.Attributes.style "cursor" "pointer" ]
-                                [ Html.text <| Maybe.withDefault "" task.tag ]
-                            ]
+
+                        -- Debug.todo
+                        -- , td
+                        --     [ Html.Events.onClick (ToggleTag task.tag)
+                        --     , Html.Attributes.class "embolden"
+                        --     ]
+                        --     [ Html.span [ Html.Attributes.style "cursor" "pointer" ]
+                        --         [ Html.text <| Maybe.withDefault "" task.tag ]
+                        --     ]
                         , td
                             [ Html.Attributes.style "cursor" "pointer"
                             , Html.Attributes.style "text-align" "center"
@@ -1266,8 +1277,14 @@ viewTaskTable currentDate tasks =
                 ]
 
 
-viewTagButton : String -> String -> Element Msg
-viewTagButton selectedTag tag =
+type TagState
+    = Whitelisted
+    | Blacklisted
+    | Unselected
+
+
+viewTagButton : TagState -> String -> Element Msg
+viewTagButton tagState tag =
     let
         baseButtonAttrs =
             [ Font.semiBold
@@ -1289,27 +1306,37 @@ viewTagButton selectedTag tag =
                 , Font.sansSerif
                 ]
             ]
-
-        unSelectedAttrs =
-            [ Background.color color.white
-            , Font.color color.darkCharcoal
-            ]
-                ++ baseButtonAttrs
-
-        selectedAttrs =
-            [ Background.color color.darkCharcoal
-            , Font.color color.white
-            ]
-                ++ baseButtonAttrs
-
-        buttonAttrs =
-            if tag == selectedTag then
-                selectedAttrs
-
-            else
-                unSelectedAttrs
     in
-    button buttonAttrs { onPress = Just (SelectTag (Just tag)), label = text tag }
+    case tagState of
+        Unselected ->
+            let
+                unSelectedAttrs =
+                    [ Background.color color.white
+                    , Font.color color.darkCharcoal
+                    ]
+                        ++ baseButtonAttrs
+            in
+            button unSelectedAttrs { onPress = Just (ToggleTag tag), label = text tag }
+
+        Whitelisted ->
+            let
+                whitelistedAttrs =
+                    [ Background.color color.darkCharcoal
+                    , Font.color color.white
+                    ]
+                        ++ baseButtonAttrs
+            in
+            button whitelistedAttrs { onPress = Just (ToggleTag tag), label = text tag }
+
+        Blacklisted ->
+            let
+                blacklistedAttrs =
+                    [ Background.color color.darkCharcoal
+                    , Font.color color.red
+                    ]
+                        ++ baseButtonAttrs
+            in
+            button blacklistedAttrs { onPress = Just (ToggleTag tag), label = text tag }
 
 
 viewNewTask : Model -> Element Msg
