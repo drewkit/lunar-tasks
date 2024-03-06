@@ -249,7 +249,8 @@ type Msg
     | NewTaskUpdateTag String
     | NewTaskSetDatePicker DatePicker.Msg
     | EditTaskPeriod String
-    | EditTaskTagToggle String
+    | EditTaskDisableTag String
+    | EditTaskEnableTag String
     | EditTaskTitle String
     | EditTaskRemoveCompletionEntry Date.Date
     | EditTaskAddCompletionEntry DatePicker.Msg
@@ -480,14 +481,26 @@ update msg model =
             in
             ( { model | newTaskTag = tag }, Cmd.none )
 
-        EditTaskTagToggle tag ->
+        EditTaskEnableTag tag ->
             let
-                toggleTag =
+                enableTag =
                     BitFlags.enableFlag model.tagSettings tag
             in
             case model.editedTask of
                 Just task ->
-                    ( { model | editedTask = Just { task | bitTags = toggleTag task.bitTags } }, Cmd.none )
+                    ( { model | editedTask = Just { task | bitTags = enableTag task.bitTags } }, Cmd.none )
+
+                Nothing ->
+                    ( model, Cmd.none )
+
+        EditTaskDisableTag tag ->
+            let
+                disableTag =
+                    BitFlags.disableFlag model.tagSettings tag
+            in
+            case model.editedTask of
+                Just task ->
+                    ( { model | editedTask = Just { task | bitTags = disableTag task.bitTags } }, Cmd.none )
 
                 Nothing ->
                     ( model, Cmd.none )
@@ -919,14 +932,16 @@ viewTask model =
                     , text = String.fromInt task.period
                     , placeholder = Nothing
                     }
-
-                -- Debug.todo
-                -- , Input.text []
-                --     { label = Input.labelAbove [ Font.semiBold ] (text "Category")
-                --     , onChange = EditTaskTagToggle
-                --     , text = Maybe.withDefault "" task.tag
-                --     , placeholder = Nothing
-                --     }
+                , column []
+                    [ el [ Font.bold ] (text "Tags")
+                    , Input.text []
+                        { label = Input.labelHidden "Tag"
+                        , onChange = EditTaskEnableTag
+                        , text = ""
+                        , placeholder = Nothing
+                        }
+                    , Element.column [ spacingXY 0 15, paddingXY 0 15 ] (viewEnabledTasks task model)
+                    ]
                 , column []
                     [ el [ Font.bold ] (text "Completion Entries")
                     , el [ Border.width 1, paddingXY 10 10, Border.color color.lightGrey ] <|
@@ -939,6 +954,23 @@ viewTask model =
                     , Element.column [ spacingXY 0 15, paddingXY 0 15 ] (viewCompletionEntries task)
                     ]
                 ]
+
+
+viewEnabledTasks : LunarTask -> Model -> List (Element Msg)
+viewEnabledTasks task model =
+    BitFlags.enabledFlags model.tagSettings task.bitTags
+        |> List.map enabledFlagEntryToListedItem
+
+
+enabledFlagEntryToListedItem : String -> Element Msg
+enabledFlagEntryToListedItem flag =
+    Element.row []
+        [ text flag
+        , button []
+            { onPress = Just (EditTaskDisableTag flag)
+            , label = text " -- x"
+            }
+        ]
 
 
 viewCompletionEntries : LunarTask -> List (Element Msg)
@@ -1109,7 +1141,7 @@ viewTaskDiscovery model =
                 ]
                 { label = text "(x) reset all selections", onPress = Just FilterReset }
 
-        getTagState : String -> TagState
+        getTagState : String -> TagToggleState
         getTagState tag =
             let
                 ( whitelistedTags, blacklistedTags ) =
@@ -1277,14 +1309,14 @@ viewTaskTable currentDate tasks =
                 ]
 
 
-type TagState
+type TagToggleState
     = Whitelisted
     | Blacklisted
     | Unselected
 
 
-viewTagButton : TagState -> String -> Element Msg
-viewTagButton tagState tag =
+viewTagButton : TagToggleState -> String -> Element Msg
+viewTagButton tagToggleState tag =
     let
         baseButtonAttrs =
             [ Font.semiBold
@@ -1307,7 +1339,7 @@ viewTagButton tagState tag =
                 ]
             ]
     in
-    case tagState of
+    case tagToggleState of
         Unselected ->
             let
                 unSelectedAttrs =
