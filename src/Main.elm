@@ -1303,12 +1303,10 @@ viewTaskTable currentDate tasks =
                             ]
                             [ Html.text task.title ]
                         , td []
-                            [ Html.text <| String.fromInt (periodsPastDue currentDate task) ]
-                        , td []
                             [ Html.text <| String.fromInt task.period ]
+                        , td [] [ Html.text <| String.fromInt (getDaysPastDue currentDate task) ]
                         , td []
                             [ Html.text <| Date.toIsoString (getLastCompletedAt task) ]
-                        , td [] [ Html.text <| String.fromInt (getDaysPastDue currentDate task) ]
                         , td
                             [ Html.Attributes.style "cursor" "pointer"
                             , Html.Attributes.style "text-align" "center"
@@ -1336,12 +1334,10 @@ viewTaskTable currentDate tasks =
                         [ th []
                             [ Html.text "Task" ]
                         , th []
-                            [ Html.text "Full Periods Lapsed" ]
-                        , th []
                             [ Html.text "Cadence" ]
+                        , th [] [ Html.text "Days Past Due" ]
                         , th []
                             [ Html.text "Last Completed" ]
-                        , th [] [ Html.text "Days Past Due" ]
                         , th [] [ Html.text "Mark Completed" ]
                         , th [] [ Html.text "Remove" ]
                         ]
