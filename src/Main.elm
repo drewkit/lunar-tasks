@@ -649,12 +649,15 @@ update msg model =
                 flagSettingsResult =
                     BitFlags.initSettings
                         { bitLimit = 20
+
+                        -- , flags =
+                        --     [ "trash-grab"
+                        --     , "laundry"
+                        --     , "landscaping"
+                        --     , "digital-hygiene"
+                        --     ]
                         , flags =
-                            [ "trash-grab"
-                            , "laundry"
-                            , "landscaping"
-                            , "digital-hygiene"
-                            ]
+                            []
                         }
             in
             ( { model
@@ -1206,6 +1209,28 @@ viewTaskDiscovery model =
 
             else
                 Unselected
+
+        tagSettingsBtn =
+            Icon.settings
+                |> Icon.withSize 2
+                |> Icon.withSizeUnit "em"
+                |> Icon.toHtml []
+                |> Element.html
+
+        allTags =
+            BitFlags.allFlags model.tagSettings
+
+        tagsRow =
+            if List.length allTags <= 0 then
+                wrappedRow [ spacingXY 10 5 ]
+                    [ el [ Font.underline ] (text "Create Tags") ]
+
+            else
+                wrappedRow [ spacingXY 10 5 ]
+                    (List.map (\t -> viewTagButton (getTagState t) t)
+                        allTags
+                        ++ [ tagSettingsBtn ]
+                    )
     in
     column [ spacingXY 0 15 ]
         [ filterRow
@@ -1214,10 +1239,7 @@ viewTaskDiscovery model =
             [ searchTermInput
             , clearSearchBtn
             ]
-        , wrappedRow [ spacingXY 10 5 ]
-            (List.map (\t -> viewTagButton (getTagState t) t)
-                (BitFlags.allFlags model.tagSettings)
-            )
+        , tagsRow
         , resetOption
         ]
 
