@@ -96,13 +96,16 @@ type alias Model =
     }
 
 
+type LoadedTasks
+    = JsonExportView
+    | LoadedTasks
+
+
 type ViewType
     = LoginPrompt
     | LoadingTasksView
     | LoadingTasksFailureView
-    | LoadedTasksView
-    | JsonExportView
-    | LoggedOut
+    | LoadedTasksView LoadedTasks
 
 
 
@@ -676,7 +679,7 @@ update msg model =
                     case Decode.decodeString (Decode.list lunarTaskDecoder) demoDataString of
                         Ok tasks ->
                             ( { model
-                                | view = LoadedTasksView
+                                | view = LoadedTasksView LoadedTasks
                                 , tasks = tasks
                               }
                             , Cmd.none
@@ -723,7 +726,7 @@ update msg model =
                 Ok tasks ->
                     ( { model
                         | tasks = tasks
-                        , view = LoadedTasksView
+                        , view = LoadedTasksView LoadedTasks
                       }
                     , Cmd.none
                     )
@@ -801,11 +804,11 @@ loginlogoutButton viewType =
                 ]
 
         exportButton =
-            if viewType == JsonExportView then
-                button buttonAttrs { label = text "Return to Main", onPress = Just (ViewChange LoadedTasksView) }
+            if viewType == LoadedTasksView JsonExportView then
+                button buttonAttrs { label = text "Return to Main", onPress = Just (ViewChange (LoadedTasksView LoadedTasks)) }
 
             else
-                button buttonAttrs { label = text "JSON export", onPress = Just (ViewChange JsonExportView) }
+                button buttonAttrs { label = text "JSON export", onPress = Just (ViewChange (LoadedTasksView JsonExportView)) }
 
         logoutButton =
             row rowSpecs
@@ -814,9 +817,6 @@ loginlogoutButton viewType =
                 ]
     in
     case viewType of
-        LoggedOut ->
-            logoutButton
-
         LoginPrompt ->
             loginButton
 
@@ -893,10 +893,16 @@ view model =
     let
         innerContent =
             case model.view of
+                LoginPrompt ->
+                    viewLandingPage
+
                 LoadingTasksView ->
                     el [] <| text "Loading"
 
-                LoadedTasksView ->
+                LoadingTasksFailureView ->
+                    el [] (text "")
+
+                LoadedTasksView LoadedTasks ->
                     case model.editedTask of
                         Nothing ->
                             viewMain model
@@ -904,14 +910,8 @@ view model =
                         Just _ ->
                             viewTask model
 
-                LoginPrompt ->
-                    viewLandingPage
-
-                JsonExportView ->
+                LoadedTasksView JsonExportView ->
                     viewTasksJson model
-
-                _ ->
-                    el [] (text "")
     in
     viewLayout model innerContent
 
