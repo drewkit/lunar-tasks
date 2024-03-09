@@ -79,7 +79,7 @@ type alias Model =
     , sort : ListSort
     , tagsSelected : ( Set String, Set String )
     , searchTerm : Maybe String
-    , view : ViewType
+    , view : ViewState
     , newTaskTitle : String
     , newTaskPeriod : Int
     , newTaskTag : Maybe String
@@ -96,16 +96,21 @@ type alias Model =
     }
 
 
-type LoadedTasks
+type LoadedTasksViewState
     = JsonExportView
-    | LoadedTasks
+    | LoadedTasksView
+    | EditTaskView
 
 
-type ViewType
+
+-- | TagConfigView
+
+
+type ViewState
     = LoginPrompt
     | LoadingTasksView
     | LoadingTasksFailureView
-    | LoadedTasksView LoadedTasks
+    | LoadedTasks LoadedTasksViewState
 
 
 
@@ -141,7 +146,7 @@ type alias LoginAttributes r =
     { r
         | tasks : List LunarTask
         , taskOwner : String
-        , view : ViewType
+        , view : ViewState
         , demo : Bool
         , tagSettings : BitFlagSettings
     }
@@ -251,7 +256,7 @@ type Msg
     | ToggleSortOrder
     | SelectFilter ListFilter
     | SelectSort ListSort
-    | ViewChange ViewType
+    | ViewChange ViewState
     | MarkCompleted LunarTask Date.Date
     | CreateTask
     | NewTaskUpdateTitle String
@@ -366,10 +371,10 @@ update msg model =
                     ( model, Cmd.none )
 
                 Just task ->
-                    ( { model | editedTask = Just task }, Cmd.none )
+                    ( { model | view = LoadedTasks EditTaskView, editedTask = Just task }, Cmd.none )
 
         EditTaskCancel ->
-            ( { model | editedTask = Nothing }, Cmd.none )
+            ( { model | editedTask = Nothing, view = LoadedTasks LoadedTasksView }, Cmd.none )
 
         EditTaskSave ->
             case model.editedTask of
@@ -406,7 +411,7 @@ update msg model =
                             )
 
                     else
-                        ( { model | editedTask = Nothing }, Cmd.none )
+                        ( { model | editedTask = Nothing, view = LoadedTasks LoadedTasksView }, Cmd.none )
 
         EditTaskRemoveCompletionEntry entryDate ->
             case model.editedTask of
@@ -679,7 +684,7 @@ update msg model =
                     case Decode.decodeString (Decode.list lunarTaskDecoder) demoDataString of
                         Ok tasks ->
                             ( { model
-                                | view = LoadedTasksView LoadedTasks
+                                | view = LoadedTasks LoadedTasksView
                                 , tasks = tasks
                               }
                             , Cmd.none
@@ -726,7 +731,7 @@ update msg model =
                 Ok tasks ->
                     ( { model
                         | tasks = tasks
-                        , view = LoadedTasksView LoadedTasks
+                        , view = LoadedTasks LoadedTasksView
                       }
                     , Cmd.none
                     )
@@ -752,7 +757,7 @@ update msg model =
 -- VIEW
 
 
-loginlogoutButton : ViewType -> Element Msg
+loginlogoutButton : ViewState -> Element Msg
 loginlogoutButton viewType =
     let
         buttonAttrs =
@@ -804,11 +809,11 @@ loginlogoutButton viewType =
                 ]
 
         exportButton =
-            if viewType == LoadedTasksView JsonExportView then
-                button buttonAttrs { label = text "Return to Main", onPress = Just (ViewChange (LoadedTasksView LoadedTasks)) }
+            if viewType == LoadedTasks JsonExportView then
+                button buttonAttrs { label = text "Return to Main", onPress = Just (ViewChange (LoadedTasks LoadedTasksView)) }
 
             else
-                button buttonAttrs { label = text "JSON export", onPress = Just (ViewChange (LoadedTasksView JsonExportView)) }
+                button buttonAttrs { label = text "JSON export", onPress = Just (ViewChange (LoadedTasks JsonExportView)) }
 
         logoutButton =
             row rowSpecs
@@ -902,15 +907,13 @@ view model =
                 LoadingTasksFailureView ->
                     el [] (text "")
 
-                LoadedTasksView LoadedTasks ->
-                    case model.editedTask of
-                        Nothing ->
-                            viewMain model
+                LoadedTasks LoadedTasksView ->
+                    viewMain model
 
-                        Just _ ->
-                            viewTask model
+                LoadedTasks EditTaskView ->
+                    viewTask model
 
-                LoadedTasksView JsonExportView ->
+                LoadedTasks JsonExportView ->
                     viewTasksJson model
     in
     viewLayout model innerContent
