@@ -100,6 +100,7 @@ type LoadedTasksViewState
     = JsonExportView
     | LoadedTasksView
     | EditTaskView
+    | TagSettingsView
 
 
 
@@ -249,6 +250,7 @@ init currentTimeinMillis validAuth =
 type Msg
     = Recv { tag : String, payload : Decode.Value }
     | ToggleTag String
+    | EditTags
     | Search String
     | ClearSearch
     | ClearBanner
@@ -325,6 +327,9 @@ update msg model =
 
         ToggleTag tag ->
             ( model |> toggleTag tag, Cmd.none )
+
+        EditTags ->
+            ( { model | view = LoadedTasks TagSettingsView }, Cmd.none )
 
         SelectFilter filter ->
             ( model |> selectFilter filter, Cmd.none )
@@ -915,8 +920,16 @@ view model =
 
                 LoadedTasks JsonExportView ->
                     viewTasksJson model
+
+                LoadedTasks TagSettingsView ->
+                    viewTagSettings model
     in
     viewLayout model innerContent
+
+
+viewTagSettings : Model -> Element Msg
+viewTagSettings _ =
+    text "tag settings page"
 
 
 viewTasksJson : Model -> Element Msg
@@ -1226,7 +1239,14 @@ viewTaskDiscovery model =
         tagsRow =
             if List.length allTags <= 0 then
                 wrappedRow [ spacingXY 10 5 ]
-                    [ el [ Font.underline ] (text "Create Tags") ]
+                    [ Element.html <|
+                        Html.p
+                            [ Html.Attributes.style "cursor" "pointer"
+                            , Html.Attributes.style "text-decoration" "underline"
+                            , Html.Events.onClick EditTags
+                            ]
+                            [ Html.text "Create Tags" ]
+                    ]
 
             else
                 wrappedRow [ spacingXY 10 5 ]
