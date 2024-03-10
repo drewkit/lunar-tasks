@@ -373,7 +373,7 @@ update msg model =
                     updatedTagSettings =
                         BitFlags.updateFlag oldName model.tagNameInput model.tagSettings
                 in
-                ( { model | tagSettings = updatedTagSettings }, Cmd.none )
+                ( { model | tagSettings = updatedTagSettings, tagNameInput = "", view = LoadedTasks (TagSettingsView Nothing) }, Cmd.none )
 
             else
                 ( model, Cmd.none )
@@ -1005,6 +1005,8 @@ viewTagSettings maybeSelectedTag model =
                                                 , Html.Events.onInput UpdatedTagNameInput
                                                 ]
                                                 []
+                                            , Html.button [ Html.Events.onClick (UpdateTag tagName) ] [ Html.text "Save" ]
+                                            , Html.button [ Html.Events.onClick (SelectTagToEdit Nothing) ] [ Html.text "Cancel" ]
                                             ]
 
                                     else
@@ -1561,14 +1563,14 @@ viewTaskTable currentDate tasks =
                             , Html.Attributes.class "embolden"
                             , Html.Events.onClick (MarkCompleted task currentDate)
                             ]
-                            [ Html.text "Mark Completed" ]
+                            [ Icon.square |> Icon.toHtml [] ]
                         , td
                             [ Html.Attributes.style "cursor" "pointer"
                             , Html.Attributes.style "text-align" "center"
                             , Html.Attributes.class "embolden"
                             , Html.Events.onClick (DeleteTask task)
                             ]
-                            [ Html.text "Remove" ]
+                            [ Icon.trash2 |> Icon.toHtml [] ]
                         ]
                 )
                 data
@@ -1586,8 +1588,8 @@ viewTaskTable currentDate tasks =
                         , th [] [ Html.text "Days Past Due" ]
                         , th []
                             [ Html.text "Last Completed" ]
-                        , th [] [ Html.text "Mark Completed" ]
-                        , th [] [ Html.text "Remove" ]
+                        , th [] [ Html.text "" ]
+                        , th [] [ Html.text "" ]
                         ]
                     ]
                 , Html.tbody [ Html.Attributes.id "task-table-body" ] (populateRows tasks)

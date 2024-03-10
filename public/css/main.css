@@ -1,9 +1,9 @@
-#task-table-body > tr:hover
+#task-table-body > tr:hover, #tag-table-body > tr:hover
 {
     background-color: lightgray;
 }
 
-#task-table-body > tr > td.embolden:hover
+#task-table-body > tr > td.embolden:hover, #tag-table-body > tr > td.embolden:hover
 {
     text-shadow: 0px 0px 1px black;
 }
