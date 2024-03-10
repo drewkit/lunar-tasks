@@ -7,6 +7,7 @@ import DatePicker exposing (defaultSettings)
 import Element exposing (..)
 import Element.Background as Background
 import Element.Border as Border
+import Element.Events exposing (onClick)
 import Element.Font as Font
 import Element.Input as Input exposing (OptionState(..), button)
 import FeatherIcons as Icon exposing (Icon)
@@ -306,6 +307,7 @@ type Msg
     | LoadDemo (Result Http.Error String)
     | UserLoggedIn Decode.Value
     | DemoIdTick Time.Posix
+    | ReturnToMain
 
 
 update : Msg -> Model -> ( Model, Cmd Msg )
@@ -865,6 +867,20 @@ update msg model =
                 _ ->
                     ( model, Cmd.none )
 
+        ReturnToMain ->
+            case model.view of
+                LoginPrompt ->
+                    ( model, Cmd.none )
+
+                LoadingTasksView ->
+                    ( model, Cmd.none )
+
+                LoadingTasksFailureView ->
+                    ( model, Cmd.none )
+
+                LoadedTasks _ ->
+                    ( { model | view = LoadedTasks LoadedTasksView }, Cmd.none )
+
 
 
 -- VIEW
@@ -985,13 +1001,15 @@ viewHeader model =
             , padding 20
             , Background.color color.lightBlue
             ]
-            [ viewMoon
-            , el
-                [ Font.size 55
-                , paddingXY 15 0
-                , Font.glow color.blue 0.3
+            [ row [ onClick ReturnToMain ]
+                [ viewMoon
+                , el
+                    [ Font.size 55
+                    , paddingXY 15 0
+                    , Font.glow color.blue 0.3
+                    ]
+                    (text "LunarTasks")
                 ]
-                (text "LunarTasks")
             , loginlogoutButton model.view
             ]
         ]
@@ -1259,7 +1277,7 @@ viewTask model =
                             \query optionStr ->
                                 String.contains query optionStr
                         , selected = model.tagSearchBoxSelected
-                        , placeholder = Nothing
+                        , placeholder = Just (Input.placeholder [] <| text "Create Tags from Main")
                         , state = model.tagSearchBox
                         , label = Input.labelHidden "tag selection"
                         , toLabel =
