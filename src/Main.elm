@@ -14,7 +14,7 @@ import Html exposing (Html, td, th, tr)
 import Html.Attributes exposing (style, type_, value)
 import Html.Events
 import Http
-import Json.Decode as Decode exposing (Decoder, errorToString)
+import Json.Decode as Decode exposing (Decoder, errorToString, oneOrMore)
 import Json.Encode as Encode
 import Keyboard exposing (Key(..))
 import List
@@ -56,6 +56,9 @@ subscriptions _ =
 
 
 -- PORTS
+
+
+port tagActions : ( String, String, Encode.Value ) -> Cmd msg
 
 
 port taskAction : ( String, Encode.Value ) -> Cmd msg
@@ -119,6 +122,11 @@ type ViewState
 -- MISC DECODING / ENCODING
 
 
+taskTagsDecoder : Decoder (List String)
+taskTagsDecoder =
+    Decode.at [ "record", "tags" ] (Decode.list Decode.string)
+
+
 taskOwnerDecoder : Decoder String
 taskOwnerDecoder =
     Decode.oneOf [ googleAuthTaskOwnerDecoder, authStoreTaskOwnerDecoder ]
@@ -151,6 +159,7 @@ type alias LoginAttributes r =
         , view : ViewState
         , demo : Bool
         , tagSettings : BitFlagSettings
+        , banner : String
     }
 
 
@@ -162,6 +171,7 @@ resetLogin attrs =
         , taskOwner = ""
         , view = LoginPrompt
         , tagSettings = BitFlags.defaultSettings
+        , banner = ""
     }
 
 
@@ -288,6 +298,7 @@ type Msg
     | TaskDeleted Decode.Value
     | LogOutUser Int
     | LoadTasks Decode.Value
+    | LoadTags Decode.Value
     | LoginUser Int
     | DemoLoginUser Int
     | LoadDemo (Result Http.Error String)
@@ -309,6 +320,9 @@ update msg model =
 
         fetchTasks =
             taskAction ( "fetch", Encode.null )
+
+        fetchTags =
+            tagActions ( "fetch", model.taskOwner, Encode.null )
     in
     case msg of
         Recv data ->
@@ -328,8 +342,11 @@ update msg model =
                 "tasksFetched" ->
                     update (LoadTasks data.payload) model
 
+                "tagsFetched" ->
+                    update (LoadTags data.payload) model
+
                 _ ->
-                    update (LoadTasks Encode.null) model
+                    update (LoadTasks Encode.null) { model | banner = "Recv data unrecognized" }
 
         ToggleTag tag ->
             ( model |> toggleTag tag, Cmd.none )
@@ -741,7 +758,7 @@ update msg model =
                         | taskOwner = taskOwnerId
                         , view = LoadingTasksView
                       }
-                    , fetchTasks
+                    , Cmd.batch [ fetchTasks, fetchTags ]
                     )
 
                 Err errMsg ->
@@ -774,6 +791,35 @@ update msg model =
                 Err errMsg ->
                     ( { model
                         | view = LoadingTasksFailureView
+                        , banner = errorToString errMsg
+                      }
+                    , Cmd.none
+                    )
+
+        LoadTags jsonTags ->
+            case
+                Decode.decodeValue
+                    (Decode.at [ "items" ] <|
+                        Decode.index 0 <|
+                            Decode.at [ "tags" ] <|
+                                Decode.list Decode.string
+                    )
+                    jsonTags
+            of
+                Ok tags ->
+                    ( { model
+                        | tagSettings =
+                            Result.withDefault
+                                model.tagSettings
+                                (BitFlags.initSettings { bitLimit = 20, flags = tags })
+                        , view = LoadedTasks LoadedTasksView
+                      }
+                    , Cmd.none
+                    )
+
+                Err errMsg ->
+                    ( { model
+                        | view = LoadedTasks LoadedTasksView
                         , banner = errorToString errMsg
                       }
                     , Cmd.none

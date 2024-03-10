@@ -30,6 +30,21 @@
       }
     }
 
+    app.ports.tagActions.subscribe(function(args) {
+      var [action, userId, tags] = args
+      if (action == "update") {
+        pb.collection("users").update(userId, {tags: tags}, {fields: "tags"}).then(function(updatedTags) {
+          app.ports.messageReceiver.send({tag: "tagsUpdated", payload: updatedTags})
+        })
+      } else if (action == "fetch") {
+        pb.collection("users").getOne(userId).then(function(fetchedTags) {
+          app.ports.messageReceiver.send({tag: "tagsFetched", payload: fetchedTags})
+        })
+      } else {
+        console.log("tag action unrecognized: ", action)
+      }
+    })
+
     app.ports.userLoginAction.subscribe(function(data) {
       if (data === "login") {
         login();
