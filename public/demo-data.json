@@ -4,8 +4,7 @@
       "id": "iwuxrqp31gc8msg",
       "title": "haircut",
       "period": 25,
-      "tag": "",
-      "bitTags": 1,
+      "bitTags": 0,
       "completionEntries": [
         {
           "year": 2023,
@@ -26,8 +25,7 @@
       "id": "6jr8kjyi2e56ch0",
       "title": "wash bath rugs",
       "period": 60,
-      "tag": "laundry",
-      "bitTags": 3,
+      "bitTags": 0,
       "completionEntries": [
         {
           "year": 2023,
@@ -44,8 +42,7 @@
       "id": "xim7by2fplqt352",
       "title": "liquid fertilizer run on plants",
       "period": 300,
-      "tag": "landscaping",
-      "bitTags": 5,
+      "bitTags": 0,
       "completionEntries": [
         {
           "year": 2023,
@@ -62,8 +59,7 @@
       "id": "37wwn08brds0wb6",
       "title": "summertime spray of ac unit",
       "period": 20,
-      "tag": "landscaping",
-      "bitTags": 3,
+      "bitTags": 0,
       "completionEntries": [
         {
           "year": 2023,
@@ -81,7 +77,6 @@
       "title": "house sweep with linter",
       "period": 30,
       "bitTags": 0,
-      "tag": "",
       "completionEntries": [
         {
           "year": 2023,
@@ -94,7 +89,6 @@
       "id": "mo02gdoq8lbojb8",
       "title": "clean out bathroom duct fan",
       "period": 300,
-      "tag": "",
       "bitTags": 0,
       "completionEntries": [
         {
@@ -108,7 +102,6 @@
       "id": "aq9dy14gux59i05",
       "title": "clean out gutters",
       "period": 200,
-      "tag": "landscaping",
       "bitTags": 0,
       "completionEntries": [
         {
@@ -122,8 +115,7 @@
       "id": "n4gdbfw04zxdhst",
       "title": "Scrub shower/bath/glass porcelain",
       "period": 200,
-      "tag": "",
-      "bitTags": 5,
+      "bitTags": 0,
       "completionEntries": [
         {
           "year": 2023,
@@ -136,8 +128,7 @@
       "id": "w2t7d01ft7hof2k",
       "title": "Service Roomba",
       "period": 200,
-      "tag": "",
-      "bitTags": 5,
+      "bitTags": 0,
       "completionEntries": [
         {
           "year": 2023,
@@ -150,8 +141,7 @@
       "id": "peop52nsfqn79bg",
       "title": "Dryer Vent Cleaning",
       "period": 312,
-      "tag": "landscaping",
-      "bitTags": 2,
+      "bitTags": 0,
       "completionEntries": [
         {
           "year": 2021,
@@ -164,8 +154,7 @@
       "id": "clpedpk6k88ihnn",
       "title": "purging of fridge and freezer",
       "period": 180,
-      "tag": "trash-grab",
-      "bitTags": 2,
+      "bitTags": 0,
       "completionEntries": [
         {
           "year": 2023,
@@ -178,7 +167,6 @@
       "id": "2rqe7t3xsw549w9",
       "title": "mow lawn",
       "period": 12,
-      "tag": "landscaping",
       "bitTags": 0,
       "completionEntries": [
         {
@@ -196,7 +184,6 @@
       "id": "8up9wmyfq3yx1dd",
       "title": "Test CO/fire detectors",
       "period": 150,
-      "tag": "",
       "bitTags": 0,
       "completionEntries": [
         {
@@ -210,8 +197,7 @@
       "id": "nrjz88uv4q7khrq",
       "title": "wipe window sills",
       "period": 180,
-      "tag": "",
-      "bitTags": 5,
+      "bitTags": 0,
       "completionEntries": [
         {
           "year": 2023,
@@ -224,7 +210,6 @@
       "id": "ik5z7sqcpo5sube",
       "title": "pull weeds from yard",
       "period": 30,
-      "tag": "landscaping",
       "bitTags": 0,
       "completionEntries": [
         {
@@ -246,7 +231,6 @@
       "id": "uec0vsb11lp08o4",
       "title": "scrub toilet bowls",
       "period": 15,
-      "tag": "",
       "bitTags": 0,
       "completionEntries": [
         {
@@ -264,7 +248,6 @@
       "id": "a74pdbo9zc31epq",
       "title": "drain washer plug",
       "period": 60,
-      "tag": "laundry",
       "bitTags": 0,
       "completionEntries": [
         {
@@ -282,7 +265,6 @@
       "id": "juazik5ff37whpw",
       "title": "clean mattress protectors",
       "period": 365,
-      "tag": "laundry",
       "bitTags": 0,
       "completionEntries": [
         {
@@ -296,8 +278,7 @@
       "id": "lbwb01knpr1du7p",
       "title": "clear out lint bin from laundry room",
       "period": 300,
-      "tag": "trash-grab",
-      "bitTags": 2,
+      "bitTags": 0,
       "completionEntries": [
         {
           "year": 2023,
@@ -310,7 +291,6 @@
       "id": "tggs3d4jdi97b80",
       "title": "Clean Desktop of Screenshots/etc",
       "period": 200,
-      "tag": "digital-hygiene",
       "bitTags": 0,
       "completionEntries": [
         {
@@ -324,7 +304,6 @@
       "id": "yiqy0q4lgejntt6",
       "title": "have arborist go over property",
       "period": 500,
-      "tag": "",
       "bitTags": 0,
       "completionEntries": [
         {
@@ -338,7 +317,6 @@
       "id": "tsijfek26y746g3",
       "title": "spray garage door springs",
       "period": 40,
-      "tag": "",
       "bitTags": 0,
       "completionEntries": [
         {

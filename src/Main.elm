@@ -270,7 +270,6 @@ type Msg
     | CreateTask
     | NewTaskUpdateTitle String
     | NewTaskUpdatePeriod String
-    | NewTaskUpdateTag String
     | NewTaskSetDatePicker DatePicker.Msg
     | EditTaskPeriod String
     | EditTaskDisableTag String
@@ -540,17 +539,6 @@ update msg model =
                 Nothing ->
                     ( model, Cmd.none )
 
-        NewTaskUpdateTag rawTag ->
-            let
-                tag =
-                    if String.trim rawTag == "" then
-                        Nothing
-
-                    else
-                        Just rawTag
-            in
-            ( { model | newTaskTag = tag }, Cmd.none )
-
         EditTaskEnableTag tag ->
             let
                 enableTag =
@@ -712,14 +700,7 @@ update msg model =
                     BitFlags.initSettings
                         { bitLimit = 20
                         , flags =
-                            [ "trash-grab"
-                            , "laundry"
-                            , "landscaping"
-                            , "digital-hygiene"
-                            ]
-
-                        -- , flags =
-                        --     []
+                            []
                         }
             in
             ( { model
@@ -1673,12 +1654,6 @@ viewNewTask model =
                 , label = Input.labelAbove [ Font.bold ] <| text "Cadence (in days)"
                 , text = String.fromInt model.newTaskPeriod
                 , onChange = NewTaskUpdatePeriod
-                }
-            , Input.text []
-                { placeholder = Nothing
-                , text = Maybe.withDefault "" model.newTaskTag
-                , onChange = NewTaskUpdateTag
-                , label = Input.labelAbove [ Font.bold ] <| text "Category"
                 }
             , column []
                 [ el [ Font.bold, paddingXY 0 4 ] (text "Date of Last Completion")
