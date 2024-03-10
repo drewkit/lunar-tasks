@@ -1219,9 +1219,10 @@ enabledFlagEntryToListedItem : String -> Element Msg
 enabledFlagEntryToListedItem flag =
     Element.row []
         [ text flag
+        , text " -- "
         , button []
             { onPress = Just (EditTaskDisableTag flag)
-            , label = text " -- x"
+            , label = Icon.trash2 |> Icon.toHtml [] |> Element.html
             }
         ]
 
@@ -1238,7 +1239,7 @@ completedEntryToListedItem entryTime =
         [ text (Date.toIsoString entryTime ++ " -- ")
         , button []
             { onPress = Just (EditTaskRemoveCompletionEntry entryTime)
-            , label = text "x"
+            , label = Icon.trash2 |> Icon.toHtml [] |> Element.html
             }
         ]
 
