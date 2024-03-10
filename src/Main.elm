@@ -256,6 +256,7 @@ type Msg
     | DeleteTag String
     | UpdatedTagNameInput String
     | CreateTag
+    | UpdateTag String String
     | Search String
     | ClearSearch
     | ClearBanner
@@ -353,6 +354,17 @@ update msg model =
                         BitFlags.createFlag model.tagNameInput model.tagSettings
                 in
                 ( { model | tagSettings = Result.withDefault model.tagSettings addedToTagSettings, tagNameInput = "" }, Cmd.none )
+
+            else
+                ( model, Cmd.none )
+
+        UpdateTag oldName newName ->
+            if model.demo then
+                let
+                    updatedTagSettings =
+                        BitFlags.updateFlag oldName newName model.tagSettings
+                in
+                ( { model | tagSettings = updatedTagSettings }, Cmd.none )
 
             else
                 ( model, Cmd.none )
@@ -1008,11 +1020,7 @@ viewTagSettings model =
     el [ width fill ] <|
         Element.html <|
             Html.div []
-                [ Html.div []
-                    [ Html.input [ Html.Attributes.type_ "text", Html.Attributes.placeholder "New Tag Name", Html.Attributes.value model.tagNameInput, Html.Events.onInput UpdatedTagNameInput ] []
-                    , Icon.plusCircle |> Icon.toHtml [ Html.Events.onClick CreateTag ]
-                    ]
-                , Html.table []
+                [ Html.table []
                     [ Html.thead []
                         [ tr
                             []
@@ -1022,6 +1030,10 @@ viewTagSettings model =
                             ]
                         ]
                     , Html.tbody [ Html.Attributes.id "tag-table-body" ] populateRows
+                    ]
+                , Html.div []
+                    [ Html.input [ Html.Attributes.type_ "text", Html.Attributes.placeholder "New Tag Name", Html.Attributes.value model.tagNameInput, Html.Events.onInput UpdatedTagNameInput ] []
+                    , Icon.plusCircle |> Icon.toHtml [ Html.Events.onClick CreateTag ]
                     ]
                 ]
 
