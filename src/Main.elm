@@ -90,6 +90,7 @@ type alias Model =
     , demo : Bool
     , demoId : Int
     , datePicker : DatePicker.DatePicker
+    , tagNameInput : String
     , tagSearchBox : SearchBox.State
     , tagSearchBoxText : String
     , tagSearchBoxSelected : Maybe String
@@ -228,6 +229,7 @@ init currentTimeinMillis validAuth =
             , editedTask = Nothing
             , demo = False
             , demoId = 0
+            , tagNameInput = ""
             , tagSearchBox = SearchBox.init
             , tagSearchBoxText = ""
             , tagSearchBoxSelected = Nothing
@@ -251,6 +253,9 @@ type Msg
     = Recv { tag : String, payload : Decode.Value }
     | ToggleTag String
     | EditTags
+    | DeleteTag String
+    | UpdatedTagNameInput String
+    | CreateTag
     | Search String
     | ClearSearch
     | ClearBanner
@@ -331,6 +336,27 @@ update msg model =
         EditTags ->
             ( { model | view = LoadedTasks TagSettingsView }, Cmd.none )
 
+        DeleteTag tagName ->
+            if model.demo then
+                ( { model | tagSettings = BitFlags.deleteFlag tagName model.tagSettings }, Cmd.none )
+
+            else
+                ( model, Cmd.none )
+
+        UpdatedTagNameInput updatedTagName ->
+            ( { model | tagNameInput = updatedTagName }, Cmd.none )
+
+        CreateTag ->
+            if model.demo then
+                let
+                    addedToTagSettings =
+                        BitFlags.createFlag model.tagNameInput model.tagSettings
+                in
+                ( { model | tagSettings = Result.withDefault model.tagSettings addedToTagSettings, tagNameInput = "" }, Cmd.none )
+
+            else
+                ( model, Cmd.none )
+
         SelectFilter filter ->
             ( model |> selectFilter filter, Cmd.none )
 
@@ -406,11 +432,13 @@ update msg model =
                             update (TaskUpdated (lunarTaskEncoder editedTask))
                                 { model
                                     | editedTask = Nothing
+                                    , view = LoadedTasks LoadedTasksView
                                 }
 
                         else
                             ( { model
                                 | editedTask = Nothing
+                                , view = LoadedTasks LoadedTasksView
                               }
                             , updateTask (lunarTaskEncoder editedTask)
                             )
@@ -662,15 +690,15 @@ update msg model =
                 flagSettingsResult =
                     BitFlags.initSettings
                         { bitLimit = 20
+                        , flags =
+                            [ "trash-grab"
+                            , "laundry"
+                            , "landscaping"
+                            , "digital-hygiene"
+                            ]
 
                         -- , flags =
-                        --     [ "trash-grab"
-                        --     , "laundry"
-                        --     , "landscaping"
-                        --     , "digital-hygiene"
-                        --     ]
-                        , flags =
-                            []
+                        --     []
                         }
             in
             ( { model
@@ -814,11 +842,12 @@ loginlogoutButton viewType =
                 ]
 
         exportButton =
-            if viewType == LoadedTasks JsonExportView then
-                button buttonAttrs { label = text "Return to Main", onPress = Just (ViewChange (LoadedTasks LoadedTasksView)) }
+            case viewType of
+                LoadedTasks LoadedTasksView ->
+                    button buttonAttrs { label = text "JSON export", onPress = Just (ViewChange (LoadedTasks JsonExportView)) }
 
-            else
-                button buttonAttrs { label = text "JSON export", onPress = Just (ViewChange (LoadedTasks JsonExportView)) }
+                _ ->
+                    button buttonAttrs { label = text "Return to Main", onPress = Just (ViewChange (LoadedTasks LoadedTasksView)) }
 
         logoutButton =
             row rowSpecs
@@ -928,8 +957,73 @@ view model =
 
 
 viewTagSettings : Model -> Element Msg
-viewTagSettings _ =
-    text "tag settings page"
+viewTagSettings model =
+    let
+        remainingTasksWithTag : List LunarTask -> String -> Bool
+        remainingTasksWithTag tasks tagName =
+            let
+                tagMatch =
+                    BitFlags.match model.tagSettings [ tagName ] []
+            in
+            List.any (\t -> tagMatch t.bitTags) tasks
+
+        populateRows : List (Html Msg)
+        populateRows =
+            List.map
+                (\tagName ->
+                    let
+                        allowDeleteTd =
+                            td
+                                []
+                                [ Icon.trash2
+                                    |> Icon.toHtml
+                                        [ Html.Events.onClick (DeleteTag tagName)
+                                        , Html.Attributes.style "cursor" "pointer"
+                                        ]
+                                ]
+
+                        preventDeleteTd =
+                            td
+                                [ Html.Attributes.title "tasks are still associated with this tag"
+                                ]
+                                [ Icon.alertOctagon |> Icon.toHtml [] ]
+
+                        allowOrPreventTd =
+                            if remainingTasksWithTag model.tasks tagName then
+                                preventDeleteTd
+
+                            else
+                                allowDeleteTd
+                    in
+                    tr []
+                        [ td
+                            [ Html.Attributes.class "embolden"
+                            ]
+                            [ Html.text tagName ]
+                        , allowOrPreventTd
+                        ]
+                )
+                (BitFlags.allFlags model.tagSettings)
+    in
+    el [ width fill ] <|
+        Element.html <|
+            Html.div []
+                [ Html.div []
+                    [ Html.input [ Html.Attributes.type_ "text", Html.Attributes.placeholder "New Tag Name", Html.Attributes.value model.tagNameInput, Html.Events.onInput UpdatedTagNameInput ] []
+                    , Icon.plusCircle |> Icon.toHtml [ Html.Events.onClick CreateTag ]
+                    ]
+                , Html.table []
+                    [ Html.thead []
+                        [ tr
+                            []
+                            [ th [ Html.Attributes.style "text-align" "left" ]
+                                [ Html.text "Tag Name" ]
+                            , th [] []
+                            ]
+                        ]
+                    , Html.tbody [ Html.Attributes.id "tag-table-body" ] populateRows
+                    ]
+                ]
 
 
 viewTasksJson : Model -> Element Msg
@@ -1230,7 +1324,10 @@ viewTaskDiscovery model =
             Icon.settings
                 |> Icon.withSize 2
                 |> Icon.withSizeUnit "em"
-                |> Icon.toHtml []
+                |> Icon.toHtml
+                    [ Html.Events.onClick EditTags
+                    , Html.Attributes.style "cursor" "pointer"
+                    ]
                 |> Element.html
 
         allTags =
