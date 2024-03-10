@@ -14,7 +14,7 @@ import Html exposing (Html, td, th, tr)
 import Html.Attributes exposing (style, type_, value)
 import Html.Events
 import Http
-import Json.Decode as Decode exposing (Decoder, errorToString, oneOrMore)
+import Json.Decode as Decode exposing (Decoder, errorToString)
 import Json.Encode as Encode
 import Keyboard exposing (Key(..))
 import List
@@ -171,7 +171,7 @@ resetLogin attrs =
         , demo = False
         , taskOwner = ""
         , view = LoginPrompt
-        , tagSettings = BitFlags.defaultSettings
+        , tagSettings = BitFlags.defaultSettings 25
         , banner = ""
     }
 
@@ -228,7 +228,7 @@ init currentTimeinMillis validAuth =
             , filter = FilterAll
             , sort = NoSort DESC
             , tagsSelected = ( Set.fromList [], Set.fromList [] )
-            , tagSettings = BitFlags.defaultSettings
+            , tagSettings = BitFlags.defaultSettings 25
             , searchTerm = Nothing
             , datePicker = newDatePicker
             , view = loadingOrLoginView
@@ -325,6 +325,9 @@ update msg model =
 
         fetchTags =
             tagActions ( "fetch", model.taskOwner, Encode.null )
+
+        updateTags encodedTags =
+            tagActions ( "update", model.taskOwner, encodedTags )
     in
     case msg of
         Recv data ->
@@ -347,6 +350,9 @@ update msg model =
                 "tagsFetched" ->
                     update (LoadTags data.payload) model
 
+                "tagsUpdated" ->
+                    update (LoadTags data.payload) model
+
                 _ ->
                     update (LoadTasks Encode.null) { model | banner = "Recv data unrecognized" }
 
@@ -364,37 +370,51 @@ update msg model =
                 Nothing ->
                     ( { model | view = LoadedTasks (TagSettingsView Nothing), tagNameInput = "" }, Cmd.none )
 
-        DeleteTag tagName ->
+        CreateTag ->
+            let
+                addedToTagSettings =
+                    BitFlags.createFlag model.tagNameInput model.tagSettings
+            in
             if model.demo then
-                ( { model | tagSettings = BitFlags.deleteFlag tagName model.tagSettings, view = LoadedTasks (TagSettingsView Nothing) }, Cmd.none )
+                case addedToTagSettings of
+                    Ok updatedSettings ->
+                        ( { model | tagNameInput = "", tagSettings = updatedSettings }, Cmd.none )
+
+                    Err errMsg ->
+                        ( { model | banner = errMsg }, Cmd.none )
 
             else
-                ( model, Cmd.none )
+                case addedToTagSettings of
+                    Ok updatedSettings ->
+                        ( { model | tagNameInput = "" }, updateTags <| Encode.list Encode.string (BitFlags.serialize updatedSettings) )
+
+                    Err errMsg ->
+                        ( { model | banner = errMsg }, Cmd.none )
+
+        UpdateTag oldName ->
+            let
+                updatedTagSettings =
+                    BitFlags.updateFlag oldName model.tagNameInput model.tagSettings
+            in
+            if model.demo then
+                ( { model | tagSettings = updatedTagSettings, view = LoadedTasks (TagSettingsView Nothing) }, Cmd.none )
+
+            else
+                ( model, updateTags (Encode.list Encode.string (BitFlags.serialize updatedTagSettings)) )
+
+        DeleteTag tagName ->
+            let
+                updatedTagSettings =
+                    BitFlags.deleteFlag tagName model.tagSettings
+            in
+            if model.demo then
+                ( { model | tagSettings = updatedTagSettings, view = LoadedTasks (TagSettingsView Nothing) }, Cmd.none )
+
+            else
+                ( model, updateTags (Encode.list Encode.string (BitFlags.serialize updatedTagSettings)) )
 
         UpdatedTagNameInput updatedTagName ->
             ( { model | tagNameInput = updatedTagName }, Cmd.none )
-
-        CreateTag ->
-            if model.demo then
-                let
-                    addedToTagSettings =
-                        BitFlags.createFlag model.tagNameInput model.tagSettings
-                in
-                ( { model | tagSettings = Result.withDefault model.tagSettings addedToTagSettings, tagNameInput = "" }, Cmd.none )
-
-            else
-                ( model, Cmd.none )
-
-        UpdateTag oldName ->
-            if model.demo then
-                let
-                    updatedTagSettings =
-                        BitFlags.updateFlag oldName model.tagNameInput model.tagSettings
-                in
-                ( { model | tagSettings = updatedTagSettings, tagNameInput = "", view = LoadedTasks (TagSettingsView Nothing) }, Cmd.none )
-
-            else
-                ( model, Cmd.none )
 
         SelectFilter filter ->
             ( model |> selectFilter filter, Cmd.none )
@@ -717,7 +737,7 @@ update msg model =
             let
                 flagSettingsResult =
                     BitFlags.initSettings
-                        { bitLimit = 20
+                        { bitLimit = 25
                         , flags =
                             []
                         }
@@ -727,7 +747,7 @@ update msg model =
                 , demo = True
                 , taskOwner = "demoTaskOwnerId"
                 , tagSettings =
-                    Result.withDefault BitFlags.defaultSettings flagSettingsResult
+                    Result.withDefault (BitFlags.defaultSettings 25) flagSettingsResult
               }
             , Http.get { url = "/demo-data.json", expect = Http.expectString LoadDemo }
             )
@@ -799,12 +819,23 @@ update msg model =
                     )
 
         LoadTags jsonTags ->
-            case
-                Decode.decodeValue
-                    (Decode.at [ "items" ] <|
+            let
+                updateDecoder =
+                    Decode.at [ "tags" ] <|
+                        Decode.list Decode.string
+
+                fetchDecoder =
+                    Decode.at [ "items" ] <|
                         Decode.index 0 <|
                             Decode.at [ "tags" ] <|
                                 Decode.list Decode.string
+            in
+            case
+                Decode.decodeValue
+                    (Decode.oneOf
+                        [ fetchDecoder
+                        , updateDecoder
+                        ]
                     )
                     jsonTags
             of
@@ -813,8 +844,7 @@ update msg model =
                         | tagSettings =
                             Result.withDefault
                                 model.tagSettings
-                                (BitFlags.initSettings { bitLimit = 20, flags = tags })
-                        , view = LoadedTasks LoadedTasksView
+                                (BitFlags.initSettings { bitLimit = 25, flags = tags })
                         , tagResourcesLoaded = True
                       }
                     , Cmd.none
@@ -822,8 +852,7 @@ update msg model =
 
                 Err errMsg ->
                     ( { model
-                        | view = LoadedTasks LoadedTasksView
-                        , banner = errorToString errMsg
+                        | banner = errorToString errMsg
                       }
                     , Cmd.none
                     )
