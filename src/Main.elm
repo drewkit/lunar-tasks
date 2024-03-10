@@ -97,6 +97,7 @@ type alias Model =
     , tagSearchBox : SearchBox.State
     , tagSearchBoxText : String
     , tagSearchBoxSelected : Maybe String
+    , tagResourcesLoaded : Bool
     }
 
 
@@ -243,6 +244,7 @@ init currentTimeinMillis validAuth =
             , tagSearchBox = SearchBox.init
             , tagSearchBoxText = ""
             , tagSearchBoxSelected = Nothing
+            , tagResourcesLoaded = False
             }
     in
     ( model
@@ -813,6 +815,7 @@ update msg model =
                                 model.tagSettings
                                 (BitFlags.initSettings { bitLimit = 20, flags = tags })
                         , view = LoadedTasks LoadedTasksView
+                        , tagResourcesLoaded = True
                       }
                     , Cmd.none
                     )
@@ -1470,7 +1473,10 @@ viewTaskDiscovery model =
             BitFlags.allFlags model.tagSettings
 
         tagsRow =
-            if List.length allTags <= 0 then
+            if not model.tagResourcesLoaded then
+                Element.none
+
+            else if List.length allTags <= 0 then
                 wrappedRow [ spacingXY 10 5 ]
                     [ Element.html <|
                         Html.p
