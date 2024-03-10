@@ -26,7 +26,7 @@ type alias LunarTask =
     , title : String
     , id : String
     , period : Int
-    , tag : Maybe String
+    , bitTags : Int
     , completionEntries : List Date.Date
     }
 
@@ -163,15 +163,6 @@ deleteTaskFromList taskId taskList =
 lunarTaskEncoder : LunarTask -> Encode.Value
 lunarTaskEncoder task =
     let
-        encodedTag : Encode.Value
-        encodedTag =
-            case task.tag of
-                Just tagVal ->
-                    Encode.string tagVal
-
-                Nothing ->
-                    Encode.null
-
         completionEntryToObject date =
             [ ( "year", Encode.int (Date.year date) )
             , ( "day", Encode.int (Date.ordinalDay date) )
@@ -182,7 +173,7 @@ lunarTaskEncoder task =
         , ( "id", Encode.string task.id )
         , ( "title", Encode.string task.title )
         , ( "period", Encode.int task.period )
-        , ( "tag", encodedTag )
+        , ( "bitTags", Encode.int task.bitTags )
         , ( "completionEntries", Encode.list Encode.object (List.map completionEntryToObject task.completionEntries) )
         ]
 
@@ -194,7 +185,7 @@ lunarTaskDecoder =
         (field "title" string)
         (field "id" string)
         (field "period" int)
-        (field "tag" (Json.Decode.maybe string))
+        (field "bitTags" int)
         (field "completionEntries" (Json.Decode.list entryDecoder))
 
 

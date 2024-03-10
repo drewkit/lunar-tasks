@@ -1,15 +1,18 @@
 module ListSettings exposing (..)
 
+import BitFlags exposing (BitFlagSettings)
 import Date
 import LunarTask exposing (..)
+import Set exposing (Set)
 
 
 type alias ListSettings r =
     { r
         | filter : ListFilter
         , sort : ListSort
-        , tagSelected : Maybe String
+        , tagsSelected : ( Set String, Set String )
         , searchTerm : Maybe String
+        , tagSettings : BitFlagSettings
     }
 
 
@@ -43,7 +46,7 @@ resetFilter listSettings =
     { listSettings
         | filter = FilterAll
         , sort = NoSort DESC
-        , tagSelected = Nothing
+        , tagsSelected = ( Set.fromList [], Set.fromList [] )
         , searchTerm = Nothing
     }
 
@@ -53,22 +56,31 @@ updateSort listSort listSettings =
     { listSettings | sort = listSort }
 
 
-selectTag : Maybe String -> ListSettings r -> ListSettings r
-selectTag maybeTagName listSettings =
-    case maybeTagName of
-        Nothing ->
-            listSettings
+toggleTag : String -> ListSettings r -> ListSettings r
+toggleTag tag listSettings =
+    let
+        ( whitelistTags, blacklistTags ) =
+            listSettings.tagsSelected
 
-        Just tagName ->
-            let
-                tagSelected =
-                    if listSettings.tagSelected == Just tagName then
-                        Nothing
+        whitelistMember =
+            Set.member tag whitelistTags
 
-                    else
-                        Just tagName
-            in
-            { listSettings | tagSelected = tagSelected }
+        blacklistMember =
+            Set.member tag blacklistTags
+    in
+    case ( whitelistMember, blacklistMember ) of
+        ( False, False ) ->
+            { listSettings | tagsSelected = ( Set.insert tag whitelistTags, blacklistTags ) }
+
+        ( True, False ) ->
+            { listSettings | tagsSelected = ( Set.remove tag whitelistTags, Set.insert tag blacklistTags ) }
+
+        ( False, True ) ->
+            { listSettings | tagsSelected = ( whitelistTags, Set.remove tag blacklistTags ) }
+
+        -- revisit this to make impossible states impossible
+        ( True, True ) ->
+            { listSettings | tagsSelected = ( Set.remove tag whitelistTags, Set.remove tag blacklistTags ) }
 
 
 toggleSortOrder : ListSettings r -> ListSettings r
@@ -121,24 +133,9 @@ filterTaskList listFilter currentDate tasks =
             List.filter (pastDueByPeriods currentDate periods) tasks
 
 
-filterByTag : Maybe String -> List LunarTask -> List LunarTask
-filterByTag maybeTagSelected tasks =
-    let
-        hasTag : String -> LunarTask -> Bool
-        hasTag tag task =
-            case .tag task of
-                Just val ->
-                    val == tag
-
-                Nothing ->
-                    False
-    in
-    case maybeTagSelected of
-        Just tagName ->
-            List.filter (hasTag tagName) tasks
-
-        Nothing ->
-            tasks
+filterByTags : (Int -> Bool) -> List LunarTask -> List LunarTask
+filterByTags match tasks =
+    List.filter (\t -> match t.bitTags) tasks
 
 
 hasTerm : String -> LunarTask -> Bool
