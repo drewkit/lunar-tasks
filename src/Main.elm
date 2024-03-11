@@ -1645,14 +1645,15 @@ viewTaskTable currentDate tasks =
                             , Html.Attributes.class "embolden"
                             , Html.Events.onClick (MarkCompleted task currentDate)
                             ]
-                            [ Icon.square |> Icon.toHtml [] ]
+                            [ Html.div [ Html.Attributes.class "selective-icon-opts", Html.Attributes.title "Mark Task Completed" ] [ Icon.checkSquare |> Icon.toHtml [] ]
+                            ]
                         , td
                             [ Html.Attributes.style "cursor" "pointer"
                             , Html.Attributes.style "text-align" "center"
                             , Html.Attributes.class "embolden"
                             , Html.Events.onClick (DeleteTask task)
                             ]
-                            [ Icon.trash2 |> Icon.toHtml [] ]
+                            [ Html.div [ Html.Attributes.class "selective-icon-opts", Html.Attributes.title "Delete Task" ] [ Icon.trash2 |> Icon.toHtml [] ] ]
                         ]
                 )
                 data
