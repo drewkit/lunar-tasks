@@ -744,7 +744,7 @@ update msg model =
                     BitFlags.initSettings
                         { bitLimit = 25
                         , flags =
-                            [ "indoors", "outdoors", "digital" ]
+                            [ "indoors", "outdoors", "digital", "family" ]
                         }
             in
             ( { model
