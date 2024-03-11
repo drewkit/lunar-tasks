@@ -1,3 +1,5 @@
+/* Table Row Highlighting */
+
 #task-table-body > tr:hover, #tag-table-body > tr:hover
 {
     background-color: lightgray;
@@ -8,6 +10,8 @@
     text-shadow: 0px 0px 1px black;
 }
 
+/* Table Row Revealing Icon Options with hover */
+
 #task-table-body > tr > td > div.selective-icon-opts
 {
     visibility: hidden;
@@ -17,6 +21,22 @@
 {
     visibility: visible;
 }
+
+/* Square icon transitioning to checked when hovering over checkbox */
+
+div.selective-icon-opts-checkbox:hover > div.selective-icon-activated
+{
+
+    display: block;
+}
+
+div.selective-icon-opts-checkbox:hover > div.selective-icon-inactivated,
+div.selective-icon-opts-checkbox > div.selective-icon-activated
+{
+    display: none;
+}
+
+/* General styling */
 
 table
 {
