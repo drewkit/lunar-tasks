@@ -162,6 +162,7 @@ type alias LoginAttributes r =
         , demo : Bool
         , tagSettings : BitFlagSettings
         , banner : String
+        , tagResourcesLoaded : Bool
     }
 
 
@@ -174,6 +175,7 @@ resetLogin attrs =
         , view = LoginPrompt
         , tagSettings = BitFlags.defaultSettings 25
         , banner = ""
+        , tagResourcesLoaded = False
     }
 
 
@@ -750,6 +752,7 @@ update msg model =
                 , taskOwner = "demoTaskOwnerId"
                 , tagSettings =
                     Result.withDefault (BitFlags.defaultSettings 25) flagSettingsResult
+                , tagResourcesLoaded = True
               }
             , Http.get { url = "/demo-data.json", expect = Http.expectString LoadDemo }
             )
