@@ -1645,7 +1645,14 @@ viewTaskTable currentDate tasks =
                             , Html.Attributes.class "embolden"
                             , Html.Events.onClick (MarkCompleted task currentDate)
                             ]
-                            [ Html.div [ Html.Attributes.class "selective-icon-opts", Html.Attributes.title "Mark Task Completed" ] [ Icon.checkSquare |> Icon.toHtml [] ]
+                            [ Html.div
+                                [ Html.Attributes.class "selective-icon-opts"
+                                , Html.Attributes.class "selective-icon-opts-checkbox"
+                                , Html.Attributes.title "Mark Task Completed"
+                                ]
+                                [ Html.div [ Html.Attributes.class "selective-icon-activated" ] [ Icon.checkSquare |> Icon.toHtml [] ]
+                                , Html.div [ Html.Attributes.class "selective-icon-inactivated" ] [ Icon.square |> Icon.toHtml [] ]
+                                ]
                             ]
                         , td
                             [ Html.Attributes.style "cursor" "pointer"
