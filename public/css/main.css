@@ -8,6 +8,16 @@
     text-shadow: 0px 0px 1px black;
 }
 
+#task-table-body > tr > td > div.selective-icon-opts
+{
+    visibility: hidden;
+}
+
+#task-table-body > tr:hover > td > div.selective-icon-opts
+{
+    visibility: visible;
+}
+
 table
 {
     min-width: 100%;

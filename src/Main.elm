@@ -162,6 +162,7 @@ type alias LoginAttributes r =
         , demo : Bool
         , tagSettings : BitFlagSettings
         , banner : String
+        , tagResourcesLoaded : Bool
     }
 
 
@@ -174,6 +175,7 @@ resetLogin attrs =
         , view = LoginPrompt
         , tagSettings = BitFlags.defaultSettings 25
         , banner = ""
+        , tagResourcesLoaded = False
     }
 
 
@@ -750,6 +752,7 @@ update msg model =
                 , taskOwner = "demoTaskOwnerId"
                 , tagSettings =
                     Result.withDefault (BitFlags.defaultSettings 25) flagSettingsResult
+                , tagResourcesLoaded = True
               }
             , Http.get { url = "/demo-data.json", expect = Http.expectString LoadDemo }
             )
@@ -1633,8 +1636,6 @@ viewTaskTable currentDate tasks =
                             , Html.Attributes.class "embolden"
                             ]
                             [ Html.text task.title ]
-                        , td []
-                            [ Html.text <| String.fromInt task.period ]
                         , td [] [ Html.text <| String.fromInt (getDaysPastDue currentDate task) ]
                         , td []
                             [ Html.text <| Date.toIsoString (getLastCompletedAt task) ]
@@ -1644,14 +1645,15 @@ viewTaskTable currentDate tasks =
                             , Html.Attributes.class "embolden"
                             , Html.Events.onClick (MarkCompleted task currentDate)
                             ]
-                            [ Icon.square |> Icon.toHtml [] ]
+                            [ Html.div [ Html.Attributes.class "selective-icon-opts", Html.Attributes.title "Mark Task Completed" ] [ Icon.checkSquare |> Icon.toHtml [] ]
+                            ]
                         , td
                             [ Html.Attributes.style "cursor" "pointer"
                             , Html.Attributes.style "text-align" "center"
                             , Html.Attributes.class "embolden"
                             , Html.Events.onClick (DeleteTask task)
                             ]
-                            [ Icon.trash2 |> Icon.toHtml [] ]
+                            [ Html.div [ Html.Attributes.class "selective-icon-opts", Html.Attributes.title "Delete Task" ] [ Icon.trash2 |> Icon.toHtml [] ] ]
                         ]
                 )
                 data
@@ -1662,12 +1664,10 @@ viewTaskTable currentDate tasks =
                 [ Html.thead []
                     [ tr
                         []
-                        [ th []
+                        [ th [ Html.Attributes.style "text-align" "left" ]
                             [ Html.text "Task" ]
-                        , th []
-                            [ Html.text "Cadence" ]
-                        , th [] [ Html.text "Days Past Due" ]
-                        , th []
+                        , th [ Html.Attributes.style "text-align" "left" ] [ Html.text "Days Past Due" ]
+                        , th [ Html.Attributes.style "text-align" "left" ]
                             [ Html.text "Last Completed" ]
                         , th [] [ Html.text "" ]
                         , th [] [ Html.text "" ]
