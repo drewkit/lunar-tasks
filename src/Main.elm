@@ -652,6 +652,7 @@ update msg model =
                 SearchBox.SearchBoxChanged subMsg ->
                     ( { model
                         | tagSearchBox = SearchBox.update subMsg model.tagSearchBox
+                        , tagSearchBoxText = ""
                       }
                     , Cmd.none
                     )
@@ -743,7 +744,7 @@ update msg model =
                     BitFlags.initSettings
                         { bitLimit = 25
                         , flags =
-                            []
+                            [ "indoors", "outdoors", "digital" ]
                         }
             in
             ( { model
