@@ -967,7 +967,7 @@ viewDemoModeBanner demo =
     if demo then
         row
             [ width fill
-            , Background.color color.darkCharcoal
+            , Background.color color.green
             ]
             [ el [ Font.center, Font.color color.white, width fill, Font.semiBold, paddingXY 0 5 ] <| text "DEMO MODE" ]
 
@@ -1660,7 +1660,15 @@ viewTaskTable currentDate tasks =
                             , Html.Attributes.class "embolden"
                             , Html.Events.onClick (DeleteTask task)
                             ]
-                            [ Html.div [ Html.Attributes.class "selective-icon-opts", Html.Attributes.title "Delete Task" ] [ Icon.trash2 |> Icon.toHtml [] ] ]
+                            [ Html.div
+                                [ Html.Attributes.class "selective-icon-opts"
+                                , Html.Attributes.class "selective-icon-opts-checkbox"
+                                , Html.Attributes.title "Mark Task Completed"
+                                ]
+                                [ Html.div [ Html.Attributes.class "selective-icon-activated" ] [ Icon.trash2 |> Icon.toHtml [] ]
+                                , Html.div [ Html.Attributes.class "selective-icon-inactivated" ] [ Icon.trash |> Icon.toHtml [] ]
+                                ]
+                            ]
                         ]
                 )
                 data
