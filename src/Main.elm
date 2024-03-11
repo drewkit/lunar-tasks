@@ -1636,8 +1636,6 @@ viewTaskTable currentDate tasks =
                             , Html.Attributes.class "embolden"
                             ]
                             [ Html.text task.title ]
-                        , td []
-                            [ Html.text <| String.fromInt task.period ]
                         , td [] [ Html.text <| String.fromInt (getDaysPastDue currentDate task) ]
                         , td []
                             [ Html.text <| Date.toIsoString (getLastCompletedAt task) ]
@@ -1667,8 +1665,6 @@ viewTaskTable currentDate tasks =
                         []
                         [ th []
                             [ Html.text "Task" ]
-                        , th []
-                            [ Html.text "Cadence" ]
                         , th [] [ Html.text "Days Past Due" ]
                         , th []
                             [ Html.text "Last Completed" ]
