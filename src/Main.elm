@@ -1663,10 +1663,10 @@ viewTaskTable currentDate tasks =
                 [ Html.thead []
                     [ tr
                         []
-                        [ th []
+                        [ th [ Html.Attributes.style "text-align" "left" ]
                             [ Html.text "Task" ]
-                        , th [] [ Html.text "Days Past Due" ]
-                        , th []
+                        , th [ Html.Attributes.style "text-align" "left" ] [ Html.text "Days Past Due" ]
+                        , th [ Html.Attributes.style "text-align" "left" ]
                             [ Html.text "Last Completed" ]
                         , th [] [ Html.text "" ]
                         , th [] [ Html.text "" ]
