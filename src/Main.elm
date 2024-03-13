@@ -85,8 +85,8 @@ type alias Model =
     , searchTerm : Maybe String
     , view : ViewState
     , newTaskTitle : String
+    , newTaskNotes : String
     , newTaskPeriod : Int
-    , newTaskTag : Maybe String
     , newTaskCompletedAt : Date.Date
     , banner : String
     , editedTask : Maybe LunarTask
@@ -236,8 +236,8 @@ init currentTimeinMillis validAuth =
             , datePicker = newDatePicker
             , view = loadingOrLoginView
             , newTaskTitle = ""
+            , newTaskNotes = ""
             , newTaskPeriod = 15
-            , newTaskTag = Nothing
             , newTaskCompletedAt = currentDate
             , banner = ""
             , editedTask = Nothing
@@ -284,12 +284,14 @@ type Msg
     | MarkCompleted LunarTask Date.Date
     | CreateTask
     | NewTaskUpdateTitle String
+    | NewTaskUpdateNotes String
     | NewTaskUpdatePeriod String
     | NewTaskSetDatePicker DatePicker.Msg
     | EditTaskPeriod String
     | EditTaskDisableTag String
     | EditTaskEnableTag String
     | EditTaskTitle String
+    | EditTaskNotes String
     | EditTaskRemoveCompletionEntry Date.Date
     | EditTaskAddCompletionEntry DatePicker.Msg
     | EditTaskCancel
@@ -480,6 +482,7 @@ update msg model =
                         fakeTask : LunarTask
                         fakeTask =
                             { title = ""
+                            , notes = ""
                             , period = 20
                             , completionEntries = []
                             , id = "asdfasdf"
@@ -574,6 +577,9 @@ update msg model =
         NewTaskUpdateTitle title ->
             ( { model | newTaskTitle = title }, Cmd.none )
 
+        NewTaskUpdateNotes notes ->
+            ( { model | newTaskNotes = notes }, Cmd.none )
+
         NewTaskUpdatePeriod rawPeriod ->
             case String.toInt rawPeriod of
                 Just period ->
@@ -610,6 +616,14 @@ update msg model =
             case model.editedTask of
                 Just task ->
                     ( { model | editedTask = Just { task | title = titleStr } }, Cmd.none )
+
+                Nothing ->
+                    ( model, Cmd.none )
+
+        EditTaskNotes notes ->
+            case model.editedTask of
+                Just task ->
+                    ( { model | editedTask = Just { task | notes = notes } }, Cmd.none )
 
                 Nothing ->
                     ( model, Cmd.none )
@@ -828,13 +842,13 @@ update msg model =
             let
                 updateDecoder =
                     Decode.at [ "tags" ] <|
-                        Decode.list Decode.string
+                        Decode.oneOf [ Decode.list Decode.string, Decode.null [] ]
 
                 fetchDecoder =
                     Decode.at [ "items" ] <|
                         Decode.index 0 <|
                             Decode.at [ "tags" ] <|
-                                Decode.list Decode.string
+                                Decode.oneOf [ Decode.list Decode.string, Decode.null [] ]
             in
             case
                 Decode.decodeValue
@@ -1270,6 +1284,13 @@ viewTask model =
                     { label = Input.labelAbove [ Font.semiBold ] (text "Cadence (in days)")
                     , onChange = EditTaskPeriod
                     , text = String.fromInt task.period
+                    , placeholder = Nothing
+                    }
+                , Input.multiline []
+                    { label = Input.labelAbove [ Font.semiBold ] (text "Notes")
+                    , onChange = EditTaskNotes
+                    , text = task.notes
+                    , spellcheck = True
                     , placeholder = Nothing
                     }
                 , column []
@@ -1770,6 +1791,12 @@ viewNewTask model =
                 , label = Input.labelAbove [ Font.bold ] <| text "Cadence (in days)"
                 , text = String.fromInt model.newTaskPeriod
                 , onChange = NewTaskUpdatePeriod
+                }
+            , Input.text []
+                { placeholder = Nothing
+                , label = Input.labelAbove [ Font.bold ] <| text "Notes"
+                , text = model.newTaskNotes
+                , onChange = NewTaskUpdateNotes
                 }
             , column []
                 [ el [ Font.bold, paddingXY 0 4 ] (text "Date of Last Completion")
