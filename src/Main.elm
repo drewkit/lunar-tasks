@@ -828,13 +828,13 @@ update msg model =
             let
                 updateDecoder =
                     Decode.at [ "tags" ] <|
-                        Decode.list Decode.string
+                        Decode.oneOf [ Decode.list Decode.string, Decode.null [] ]
 
                 fetchDecoder =
                     Decode.at [ "items" ] <|
                         Decode.index 0 <|
                             Decode.at [ "tags" ] <|
-                                Decode.list Decode.string
+                                Decode.oneOf [ Decode.list Decode.string, Decode.null [] ]
             in
             case
                 Decode.decodeValue
