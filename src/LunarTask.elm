@@ -17,13 +17,14 @@ module LunarTask exposing
     )
 
 import Date exposing (Unit(..))
-import Json.Decode exposing (Decoder, field, int, map2, map6, string)
+import Json.Decode exposing (Decoder, field, int, map2, map7, string)
 import Json.Encode as Encode
 
 
 type alias LunarTask =
     { taskOwner : String
     , title : String
+    , notes : String
     , id : String
     , period : Int
     , bitTags : Int
@@ -172,6 +173,7 @@ lunarTaskEncoder task =
         [ ( "taskOwner", Encode.string task.taskOwner )
         , ( "id", Encode.string task.id )
         , ( "title", Encode.string task.title )
+        , ( "notes", Encode.string task.notes )
         , ( "period", Encode.int task.period )
         , ( "bitTags", Encode.int task.bitTags )
         , ( "completionEntries", Encode.list Encode.object (List.map completionEntryToObject task.completionEntries) )
@@ -180,9 +182,10 @@ lunarTaskEncoder task =
 
 lunarTaskDecoder : Decoder LunarTask
 lunarTaskDecoder =
-    map6 LunarTask
+    map7 LunarTask
         (field "taskOwner" string)
         (field "title" string)
+        (field "notes" string)
         (field "id" string)
         (field "period" int)
         (field "bitTags" int)

@@ -13,11 +13,11 @@ type alias NewLunarTask r =
         | taskOwner : String
         , newTaskTitle : String
         , newTaskPeriod : Int
-        , newTaskTag : Maybe String
         , newTaskCompletedAt : Date.Date
         , demo : Bool
         , demoId : Int
         , currentDate : Date.Date
+        , newTaskNotes : String
     }
 
 
@@ -31,7 +31,7 @@ resetNewTask task =
         | newTaskTitle = ""
         , newTaskCompletedAt = task.currentDate
         , newTaskPeriod = 20
-        , newTaskTag = Nothing
+        , newTaskNotes = ""
     }
 
 
@@ -43,15 +43,6 @@ resetNewTask task =
 newLunarTaskEncoder : NewLunarTask r -> Encode.Value
 newLunarTaskEncoder task =
     let
-        encodedTag : Encode.Value
-        encodedTag =
-            case task.newTaskTag of
-                Just tagVal ->
-                    Encode.string tagVal
-
-                Nothing ->
-                    Encode.null
-
         date =
             task.newTaskCompletedAt
 
@@ -76,7 +67,7 @@ newLunarTaskEncoder task =
             [ ( "taskOwner", Encode.string task.taskOwner )
             , ( "title", Encode.string task.newTaskTitle )
             , ( "period", Encode.int task.newTaskPeriod )
-            , ( "tag", encodedTag )
+            , ( "notes", Encode.string task.newTaskNotes )
             , ( "completionEntries", completionEntries )
             , ( "id", Encode.string (String.fromInt task.demoId) )
             ]
@@ -86,6 +77,6 @@ newLunarTaskEncoder task =
             [ ( "taskOwner", Encode.string task.taskOwner )
             , ( "title", Encode.string task.newTaskTitle )
             , ( "period", Encode.int task.newTaskPeriod )
-            , ( "tag", encodedTag )
+            , ( "notes", Encode.string task.newTaskNotes )
             , ( "completionEntries", completionEntries )
             ]
