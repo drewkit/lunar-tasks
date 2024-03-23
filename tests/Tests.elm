@@ -1,7 +1,6 @@
-module Example exposing (..)
+module Tests exposing (..)
 
-import Expect exposing (Expectation)
-import Fuzz exposing (Fuzzer, int, list, string)
+import Expect
 import Main exposing (..)
 import Test exposing (..)
 
@@ -26,5 +25,5 @@ suite =
                     ( updatedModel, _ ) =
                         update CreateTask demoModel
                 in
-                Expect.greaterThan 0 (List.length updatedModel.tasks)
+                Expect.equal 1 (List.length updatedModel.tasks)
         ]
