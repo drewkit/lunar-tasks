@@ -70,6 +70,7 @@ newLunarTaskEncoder task =
             , ( "notes", Encode.string task.newTaskNotes )
             , ( "completionEntries", completionEntries )
             , ( "id", Encode.string (String.fromInt task.demoId) )
+            , ( "bitTags", Encode.int 0 )
             ]
 
     else
