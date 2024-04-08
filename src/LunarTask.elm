@@ -101,14 +101,14 @@ pastDueByDays currentDate days task =
     getDaysPastDue currentDate task >= days
 
 
-periodsPastDue : Date.Date -> LunarTask -> Int
+periodsPastDue : Date.Date -> LunarTask -> Float
 periodsPastDue currentDate task =
-    getDaysPastDue currentDate task // task.period
+    toFloat (getDaysPastDue currentDate task) / toFloat task.period
 
 
 pastDueByPeriods : Date.Date -> Int -> LunarTask -> Bool
 pastDueByPeriods currentDate periods task =
-    periodsPastDue currentDate task >= periods
+    periodsPastDue currentDate task >= toFloat periods
 
 
 
