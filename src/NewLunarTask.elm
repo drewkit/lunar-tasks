@@ -1,6 +1,7 @@
 module NewLunarTask exposing
     ( NewLunarTask
     , newLunarTaskEncoder
+    , newLunarTaskReady
     , resetNewTask
     )
 
@@ -35,8 +36,21 @@ resetNewTask task =
     }
 
 
+newLunarTaskReady : NewLunarTask r -> Bool
+newLunarTaskReady task =
+    let
+        sanitizedTitle =
+            task.newTaskTitle
+                |> String.trim
+    in
+    if String.isEmpty sanitizedTitle then
+        False
 
--- TASK SETTERS/GETTERS
+    else
+        True
+
+
+
 -- ENCODER / DECODER
 
 
