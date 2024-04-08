@@ -1481,7 +1481,7 @@ viewTaskDiscovery model =
                 , options =
                     [ Input.optionWith (SortPastDueDays DESC) <| radioOption "Days Past Due"
                     , Input.optionWith (SortLastCompleted DESC) <| radioOption "Last Completed"
-                    , Input.optionWith (SortPastDuePeriods DESC) <| radioOption "Past Due Periods"
+                    , Input.optionWith (SortPastDuePeriods DESC) <| radioOption "Periods Lapsed"
                     , Input.optionWith (NoSort DESC) <| radioOption "Default"
                     ]
                 }
