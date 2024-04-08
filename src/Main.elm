@@ -1656,6 +1656,7 @@ viewTaskTable currentDate tasks =
                             [ Html.Attributes.style "cursor" "pointer"
                             , Html.Events.onClick (EditTask task.id)
                             , Html.Attributes.class "embolden"
+                            , Html.Attributes.title task.notes
                             ]
                             [ Html.text task.title ]
                         , td [] [ Html.text <| String.fromInt (getDaysPastDue currentDate task) ]
