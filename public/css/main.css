@@ -60,3 +60,8 @@ table tr td, table tr th
     border-width: thin;
     font-size: 22px;
 }
+
+.disabled-new-task
+{
+    color: gray;
+}

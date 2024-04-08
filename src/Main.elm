@@ -1776,6 +1776,32 @@ viewTagButton tagToggleState tag =
             button blacklistedAttrs { onPress = Just (ToggleTag tag), label = text tag }
 
 
+viewNewTaskCreateBtn : Model -> Element Msg
+viewNewTaskCreateBtn model =
+    if newLunarTaskReady model then
+        button [ alignBottom, paddingXY 0 5 ]
+            { onPress = Just CreateTask
+            , label =
+                Icon.plusCircle
+                    |> Icon.withSize 2
+                    |> Icon.withSizeUnit "em"
+                    |> Icon.toHtml []
+                    |> Element.html
+            }
+
+    else
+        button [ alignBottom, paddingXY 0 5 ]
+            { onPress = Nothing
+            , label =
+                Icon.plusCircle
+                    |> Icon.withSize 2
+                    |> Icon.withSizeUnit "em"
+                    |> Icon.withClass "disabled-new-task"
+                    |> Icon.toHtml [ Html.Attributes.style "cursor" "default" ]
+                    |> Element.html
+            }
+
+
 viewNewTask : Model -> Element Msg
 viewNewTask model =
     el [ paddingXY 3 3, Border.solid, Border.width 1, width fill ] <|
@@ -1808,13 +1834,5 @@ viewNewTask model =
                         |> Element.html
                     )
                 ]
-            , button [ alignBottom, paddingXY 0 5 ]
-                { onPress = Just CreateTask
-                , label =
-                    Icon.plusCircle
-                        |> Icon.withSize 2
-                        |> Icon.withSizeUnit "em"
-                        |> Icon.toHtml []
-                        |> Element.html
-                }
+            , viewNewTaskCreateBtn model
             ]
