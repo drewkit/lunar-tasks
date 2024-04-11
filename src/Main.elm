@@ -719,7 +719,7 @@ update msg model =
                 currentDate =
                     Date.fromPosix model.currentZone time
             in
-            ( { model | currentDate = currentDate }, Cmd.none )
+            ( { model | currentDate = currentDate, newTaskCompletedAt = currentDate }, Cmd.none )
 
         TaskDeleted jsonTask ->
             case Decode.decodeValue lunarTaskDecoder jsonTask of
