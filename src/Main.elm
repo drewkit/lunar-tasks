@@ -52,6 +52,7 @@ subscriptions _ =
     Sub.batch
         [ messageReceiver Recv
         , Keyboard.downs ProcessDownKeys
+        , Time.every 60000 ReceivedCurrentTime
         ]
 
 
@@ -79,6 +80,7 @@ type alias Model =
     { tasks : List LunarTask
     , taskOwner : String
     , currentDate : Date.Date
+    , currentZone : Time.Zone
     , filter : ListFilter
     , sort : ListSort
     , tagsSelected : ( Set String, Set String )
@@ -217,8 +219,11 @@ init currentTimeinMillis validAuth =
             else
                 LoginPrompt
 
+        currentZone =
+            utc
+
         currentDate =
-            Date.fromPosix utc (Time.millisToPosix currentTimeinMillis)
+            Date.fromPosix currentZone (Time.millisToPosix currentTimeinMillis)
 
         ( newDatePicker, datePickerCmd ) =
             DatePicker.init
@@ -228,6 +233,7 @@ init currentTimeinMillis validAuth =
             { tasks = []
             , taskOwner = ""
             , currentDate = currentDate
+            , currentZone = currentZone
             , filter = FilterAll
             , sort = NoSort DESC
             , tagsSelected = ( Set.fromList [], Set.fromList [] )
@@ -252,8 +258,9 @@ init currentTimeinMillis validAuth =
     in
     ( model
     , Cmd.batch
-        [ Date.today |> Task.perform ReceivedCurrentDate
-        , loginCmd
+        [ loginCmd
+        , Time.now |> Task.perform ReceivedCurrentTime
+        , Time.here |> Task.perform AdjustTimeZone
         , Task.perform DemoIdTick Time.now
         , Cmd.map NewTaskSetDatePicker datePickerCmd
         ]
@@ -300,7 +307,8 @@ type Msg
     | EditTaskChangedTagSearchBox (SearchBox.ChangeEvent String)
     | DeleteTask LunarTask
     | ProcessDownKeys Keyboard.RawKey
-    | ReceivedCurrentDate Date
+    | AdjustTimeZone Time.Zone
+    | ReceivedCurrentTime Time.Posix
     | TaskUpdated Decode.Value
     | TaskDeleted Decode.Value
     | LogOutUser Int
@@ -703,8 +711,15 @@ update msg model =
             , Cmd.none
             )
 
-        ReceivedCurrentDate date ->
-            ( { model | currentDate = date }, Cmd.none )
+        AdjustTimeZone newZone ->
+            ( { model | currentZone = newZone }, Cmd.none )
+
+        ReceivedCurrentTime time ->
+            let
+                currentDate =
+                    Date.fromPosix model.currentZone time
+            in
+            ( { model | currentDate = currentDate }, Cmd.none )
 
         TaskDeleted jsonTask ->
             case Decode.decodeValue lunarTaskDecoder jsonTask of
