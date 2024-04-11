@@ -716,10 +716,19 @@ update msg model =
 
         ReceivedCurrentTime time ->
             let
-                currentDate =
+                newDate =
                     Date.fromPosix model.currentZone time
             in
-            ( { model | currentDate = currentDate, newTaskCompletedAt = currentDate }, Cmd.none )
+            if newDate /= model.currentDate then
+                ( { model
+                    | currentDate = newDate
+                    , newTaskCompletedAt = newDate
+                  }
+                , Time.here |> Task.perform AdjustTimeZone
+                )
+
+            else
+                ( model, Cmd.none )
 
         TaskDeleted jsonTask ->
             case Decode.decodeValue lunarTaskDecoder jsonTask of
