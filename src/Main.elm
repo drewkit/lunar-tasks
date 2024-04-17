@@ -1671,10 +1671,39 @@ color =
 viewTaskTable : Date -> List LunarTask -> Element Msg
 viewTaskTable currentDate tasks =
     let
+        periodsLapsedMessage : Date.Date -> LunarTask -> String
+        periodsLapsedMessage date task =
+            let
+                periodsLapsed =
+                    periodsPastDue date task
+                        |> round
+                        |> String.fromInt
+            in
+            if pastDue date task then
+                periodsLapsed ++ " full periods lapsed"
+
+            else
+                ""
+
         populateRows : List LunarTask -> List (Html Msg)
         populateRows data =
             List.map
                 (\task ->
+                    let
+                        pastDueTask =
+                            pastDue currentDate task
+
+                        pastDueTd =
+                            if pastDueTask then
+                                td
+                                    [ Html.Attributes.title
+                                        (periodsLapsedMessage currentDate task)
+                                    ]
+                                    [ Html.text <| String.fromInt (getDaysPastDue currentDate task) ]
+
+                            else
+                                td [] []
+                    in
                     tr []
                         [ td
                             [ Html.Attributes.style "cursor" "pointer"
@@ -1683,7 +1712,7 @@ viewTaskTable currentDate tasks =
                             , Html.Attributes.title task.notes
                             ]
                             [ Html.text task.title ]
-                        , td [] [ Html.text <| String.fromInt (getDaysPastDue currentDate task) ]
+                        , pastDueTd
                         , td []
                             [ Html.text <| Date.toIsoString (getLastCompletedAt task) ]
                         , td
