@@ -54,7 +54,7 @@ subscriptions _ =
         [ messageReceiver Recv
         , Keyboard.downs ProcessDownKeys
         , Time.every 60000 ReceivedCurrentTime
-        , Time.every 10000 FetchTaskDigest
+        , Time.every (5 * 60000) FetchTaskDigest
         ]
 
 
@@ -785,7 +785,14 @@ update msg model =
         TaskDeleted jsonTask ->
             case Decode.decodeValue lunarTaskDecoder jsonTask of
                 Ok task ->
-                    ( { model | tasks = deleteTaskFromList task.id model.tasks }, Cmd.none )
+                    let
+                        tasks =
+                            deleteTaskFromList task.id model.tasks
+                    in
+                    ( { model | tasks = tasks }
+                    , -- report new state of task list to backend
+                      updateTaskDigest <| Encode.string (generateTaskDigest tasks)
+                    )
 
                 Err err ->
                     ( { model | banner = Decode.errorToString err }, Cmd.none )
@@ -819,6 +826,8 @@ update msg model =
 
                         -- event for incrementing demo id
                         , Task.perform DemoIdTick Time.now
+
+                        -- report new state of task list to backend
                         , updateTaskDigest <| Encode.string (generateTaskDigest tasks)
                         ]
                     )
@@ -901,7 +910,7 @@ update msg model =
             of
                 Ok tasks ->
                     ( { model
-                        | tasks = List.foldr insertOrUpdateTask model.tasks tasks
+                        | tasks = tasks
                         , view = LoadedTasks LoadedTasksView
                       }
                     , Cmd.none
