@@ -49,7 +49,7 @@ markTaskCompleted task maybeEntryDate =
                     completionEntries =
                         (entryDate :: task.completionEntries)
                             |> List.sortWith Date.compare
-                            -- |> List.reverse
+                            |> List.reverse
                             |> List.take 100
                 in
                 { task | completionEntries = completionEntries }
