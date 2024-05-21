@@ -2,7 +2,7 @@ module Tests exposing (..)
 
 import Date
 import Expect
-import LunarTask exposing (markTaskCompleted)
+import LunarTask exposing (getLastCompletedAt, markTaskCompleted)
 import Main exposing (..)
 import Test exposing (..)
 
@@ -37,4 +37,13 @@ suite =
                             (Just <| Date.fromOrdinalDate 2023 21)
                 in
                 Expect.equal (List.length <| taskWithOneMoreCompletionEntry.completionEntries) 100
+        , test "truncation does not remove newest completion entry" <|
+            \_ ->
+                let
+                    taskWithOneMoreCompletionEntry =
+                        markTaskCompleted
+                            LunarTask.lunarTaskWithOneHundredCompletionEntries
+                            (Just <| Date.fromOrdinalDate 2023 21)
+                in
+                Expect.equal (getLastCompletedAt taskWithOneMoreCompletionEntry) (Date.fromOrdinalDate 2023 21)
         ]
