@@ -103,7 +103,6 @@ type alias Model =
     , tagSearchBoxText : String
     , tagSearchBoxSelected : Maybe String
     , tagResourcesLoaded : Bool
-    , taskDigest : String
     }
 
 
@@ -254,7 +253,6 @@ init currentTimeinMillis validAuth =
             , sort = NoSort DESC
             , tagsSelected = ( Set.fromList [], Set.fromList [] )
             , tagSettings = BitFlags.defaultSettings 25
-            , taskDigest = ""
             , searchTerm = Nothing
             , datePicker = newDatePicker
             , view = loadingOrLoginView
@@ -422,9 +420,13 @@ update msg model =
                         Decode.string
             in
             case Decode.decodeValue digestDecoder jsonUser of
-                Ok digest ->
-                    if digest /= model.taskDigest then
-                        ( { model | taskDigest = digest }, fetchTasks )
+                Ok backendTaskDigest ->
+                    let
+                        currentTaskDigest =
+                            generateTaskDigest model.tasks
+                    in
+                    if backendTaskDigest /= currentTaskDigest then
+                        ( model, fetchTasks )
 
                     else
                         ( model, Cmd.none )
