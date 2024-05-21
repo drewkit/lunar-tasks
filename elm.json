@@ -7,6 +7,7 @@
     "dependencies": {
         "direct": {
             "CurrySoftware/elm-datepicker": "4.0.0",
+            "TSFoster/elm-sha1": "2.1.1",
             "drewkit/elm-bit-flags": "2.0.0",
             "elm/browser": "1.0.2",
             "elm/core": "1.0.5",
@@ -21,12 +22,14 @@
             "russelldavies/elm-ui-searchbox": "1.1.1"
         },
         "indirect": {
+            "danfishgold/base64-bytes": "1.1.0",
             "elm/bytes": "1.0.8",
             "elm/file": "1.0.5",
             "elm/parser": "1.1.0",
             "elm/svg": "1.0.1",
             "elm/url": "1.0.0",
-            "elm/virtual-dom": "1.0.3"
+            "elm/virtual-dom": "1.0.3",
+            "rtfeldman/elm-hex": "1.0.0"
         }
     },
     "test-dependencies": {

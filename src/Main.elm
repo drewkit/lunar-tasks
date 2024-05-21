@@ -23,6 +23,7 @@ import ListSettings exposing (..)
 import LunarTask exposing (..)
 import NewLunarTask exposing (..)
 import Process
+import SHA1
 import SearchBox
 import Set exposing (Set)
 import Task
@@ -53,6 +54,7 @@ subscriptions _ =
         [ messageReceiver Recv
         , Keyboard.downs ProcessDownKeys
         , Time.every 60000 ReceivedCurrentTime
+        , Time.every 10000 FetchTaskDigest
         ]
 
 
@@ -60,7 +62,7 @@ subscriptions _ =
 -- PORTS
 
 
-port tagActions : ( String, String, Encode.Value ) -> Cmd msg
+port userActions : ( String, String, Encode.Value ) -> Cmd msg
 
 
 port taskAction : ( String, Encode.Value ) -> Cmd msg
@@ -101,6 +103,7 @@ type alias Model =
     , tagSearchBoxText : String
     , tagSearchBoxSelected : Maybe String
     , tagResourcesLoaded : Bool
+    , taskDigest : String
     }
 
 
@@ -194,6 +197,19 @@ datePickerSettings =
 
 
 
+-- TASK DIGEST
+
+
+generateTaskDigest : List LunarTask -> String
+generateTaskDigest tasks =
+    tasks
+        |> Encode.list lunarTaskEncoder
+        |> Encode.encode 0
+        |> SHA1.fromString
+        |> SHA1.toHex
+
+
+
 -- INIT
 
 
@@ -238,6 +254,7 @@ init currentTimeinMillis validAuth =
             , sort = NoSort DESC
             , tagsSelected = ( Set.fromList [], Set.fromList [] )
             , tagSettings = BitFlags.defaultSettings 25
+            , taskDigest = ""
             , searchTerm = Nothing
             , datePicker = newDatePicker
             , view = loadingOrLoginView
@@ -278,6 +295,8 @@ type Msg
     | SelectTagToEdit (Maybe String)
     | DeleteTag String
     | UpdatedTagNameInput String
+    | CompareTaskDigest Decode.Value
+    | FetchTaskDigest Time.Posix
     | CreateTag
     | UpdateTag String
     | Search String
@@ -338,10 +357,16 @@ update msg model =
             taskAction ( "fetch", Encode.null )
 
         fetchTags =
-            tagActions ( "fetch", model.taskOwner, Encode.null )
+            userActions ( "fetchTags", model.taskOwner, Encode.null )
 
         updateTags encodedTags =
-            tagActions ( "update", model.taskOwner, encodedTags )
+            userActions ( "updateTags", model.taskOwner, encodedTags )
+
+        fetchTaskDigest =
+            userActions ( "fetchTaskDigest", model.taskOwner, Encode.null )
+
+        updateTaskDigest newDigest =
+            userActions ( "updateTaskDigest", model.taskOwner, newDigest )
     in
     case msg of
         Recv data ->
@@ -367,6 +392,9 @@ update msg model =
                 "tagsUpdated" ->
                     update (LoadTags data.payload) model
 
+                "taskDigestFetched" ->
+                    update (CompareTaskDigest data.payload) model
+
                 _ ->
                     update (LoadTasks Encode.null) { model | banner = "Recv data unrecognized" }
 
@@ -383,6 +411,26 @@ update msg model =
 
                 Nothing ->
                     ( { model | view = LoadedTasks (TagSettingsView Nothing), tagNameInput = "" }, Cmd.none )
+
+        FetchTaskDigest _ ->
+            ( model, fetchTaskDigest )
+
+        CompareTaskDigest jsonUser ->
+            let
+                digestDecoder =
+                    Decode.at [ "taskDigest" ] <|
+                        Decode.string
+            in
+            case Decode.decodeValue digestDecoder jsonUser of
+                Ok digest ->
+                    if digest /= model.taskDigest then
+                        ( { model | taskDigest = digest }, fetchTasks )
+
+                    else
+                        ( model, Cmd.none )
+
+                Err _ ->
+                    ( model, Cmd.none )
 
         CreateTag ->
             let
@@ -467,7 +515,9 @@ update msg model =
                 update (TaskUpdated jsonTaskMarkedCompleted) model
 
             else
-                ( model, updateTask jsonTaskMarkedCompleted )
+                ( model
+                , updateTask jsonTaskMarkedCompleted
+                )
 
         EditTask taskId ->
             case findTaskById taskId model.tasks of
@@ -580,7 +630,9 @@ update msg model =
                 update (TaskUpdated encodedJsonTask) modelWithNewTaskReset
 
             else
-                ( modelWithNewTaskReset, createTask encodedJsonTask )
+                ( modelWithNewTaskReset
+                , createTask encodedJsonTask
+                )
 
         NewTaskUpdateTitle title ->
             ( { model | newTaskTitle = title }, Cmd.none )
@@ -754,11 +806,11 @@ update msg model =
             in
             case Decode.decodeValue lunarTaskDecoder jsonTask of
                 Ok task ->
-                    ( let
+                    let
                         tasks =
                             insertOrUpdateTask task model.tasks
-                      in
-                      { model
+                    in
+                    ( { model
                         | banner = "task \"" ++ task.title ++ "\" -- id  " ++ task.id ++ " touched by db"
                         , tasks = tasks
                       }
@@ -767,6 +819,7 @@ update msg model =
 
                         -- event for incrementing demo id
                         , Task.perform DemoIdTick Time.now
+                        , updateTaskDigest <| Encode.string (generateTaskDigest tasks)
                         ]
                     )
 
@@ -848,7 +901,7 @@ update msg model =
             of
                 Ok tasks ->
                     ( { model
-                        | tasks = tasks
+                        | tasks = List.foldr insertOrUpdateTask model.tasks tasks
                         , view = LoadedTasks LoadedTasksView
                       }
                     , Cmd.none
