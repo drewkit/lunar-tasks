@@ -7,6 +7,7 @@ module LunarTask exposing
     , insertOrUpdateTask
     , lunarTaskDecoder
     , lunarTaskEncoder
+    , lunarTaskWithOneHundredCompletionEntries
     , markTaskCompleted
     , notPastDue
     , pastDue
@@ -215,3 +216,29 @@ type alias EntryInfo =
 entryInfoToDate : EntryInfo -> Date.Date
 entryInfoToDate info =
     Date.fromOrdinalDate info.year info.day
+
+
+
+-- Mocked Data
+
+
+lunarTaskWithOneHundredCompletionEntries : LunarTask
+lunarTaskWithOneHundredCompletionEntries =
+    let
+        completionEntries : List Date.Date
+        completionEntries =
+            List.map
+                (\day -> Date.fromOrdinalDate 2021 day)
+                (List.range
+                    1
+                    100
+                )
+    in
+    { taskOwner = "1234567"
+    , title = "taskWithOneHundredCompletionEntries"
+    , bitTags = 0
+    , notes = ""
+    , id = "1234567788"
+    , period = 20
+    , completionEntries = completionEntries
+    }
