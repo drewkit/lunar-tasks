@@ -40,11 +40,11 @@
         pb.collection("users").getOne(userId).then(function(fetchedTags) {
           app.ports.messageReceiver.send({tag: "tagsFetched", payload: fetchedTags})
         })
-      } else if (action == "updateTaskDigest") {
-        pb.collection("users").update(userId, {taskDigest: actionPayload})
-      } else if (action == "fetchTaskDigest") {
-        pb.collection("users").getOne(userId).then(function(fetchedTaskDigest) {
-          app.ports.messageReceiver.send({tag: "taskDigestFetched", payload: fetchedTaskDigest})
+      } else if (action == "updateCacheDigest") {
+        pb.collection("users").update(userId, {cacheDigest: actionPayload})
+      } else if (action == "fetchCacheDigest") {
+        pb.collection("users").getOne(userId).then(function(fetchedCacheDigest) {
+          app.ports.messageReceiver.send({tag: "cacheDigestFetched", payload: fetchedCacheDigest})
         })
       } else {
         console.log("tag action unrecognized: ", action)

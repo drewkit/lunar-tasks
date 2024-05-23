@@ -54,7 +54,7 @@ subscriptions _ =
         [ messageReceiver Recv
         , Keyboard.downs ProcessDownKeys
         , Time.every 60000 ReceivedCurrentTime
-        , Time.every (5 * 60000) FetchTaskDigest
+        , Time.every (5 * 60000) FetchCacheDigest
         ]
 
 
@@ -111,10 +111,6 @@ type LoadedTasksViewState
     | LoadedTasksView
     | EditTaskView
     | TagSettingsView (Maybe String)
-
-
-
--- | TagConfigView
 
 
 type ViewState
@@ -196,14 +192,21 @@ datePickerSettings =
 
 
 
--- TASK DIGEST
+-- CACHE DIGEST
 
 
-generateTaskDigest : List LunarTask -> String
-generateTaskDigest tasks =
+generateCacheDigest : List LunarTask -> Model -> String
+generateCacheDigest tasks model =
+    let
+        tags =
+            model.tagSettings
+                |> BitFlags.allFlags
+                |> String.join ","
+    in
     tasks
         |> Encode.list lunarTaskEncoder
         |> Encode.encode 0
+        |> (++) tags
         |> SHA1.fromString
         |> SHA1.toHex
 
@@ -293,8 +296,8 @@ type Msg
     | SelectTagToEdit (Maybe String)
     | DeleteTag String
     | UpdatedTagNameInput String
-    | CompareTaskDigest Decode.Value
-    | FetchTaskDigest Time.Posix
+    | FetchCacheDigest Time.Posix
+    | CompareCacheDigest Decode.Value
     | CreateTag
     | UpdateTag String
     | Search String
@@ -360,11 +363,11 @@ update msg model =
         updateTags encodedTags =
             userActions ( "updateTags", model.taskOwner, encodedTags )
 
-        fetchTaskDigest =
-            userActions ( "fetchTaskDigest", model.taskOwner, Encode.null )
+        fetchCacheDigest =
+            userActions ( "fetchCacheDigest", model.taskOwner, Encode.null )
 
-        updateTaskDigest newDigest =
-            userActions ( "updateTaskDigest", model.taskOwner, newDigest )
+        updateCacheDigest newDigest =
+            userActions ( "updateCacheDigest", model.taskOwner, newDigest )
     in
     case msg of
         Recv data ->
@@ -390,8 +393,8 @@ update msg model =
                 "tagsUpdated" ->
                     update (LoadTags data.payload) model
 
-                "taskDigestFetched" ->
-                    update (CompareTaskDigest data.payload) model
+                "cacheDigestFetched" ->
+                    update (CompareCacheDigest data.payload) model
 
                 _ ->
                     update (LoadTasks Encode.null) { model | banner = "Recv data unrecognized" }
@@ -410,23 +413,25 @@ update msg model =
                 Nothing ->
                     ( { model | view = LoadedTasks (TagSettingsView Nothing), tagNameInput = "" }, Cmd.none )
 
-        FetchTaskDigest _ ->
-            ( model, fetchTaskDigest )
+        FetchCacheDigest _ ->
+            ( model, fetchCacheDigest )
 
-        CompareTaskDigest jsonUser ->
+        CompareCacheDigest jsonUser ->
             let
-                digestDecoder =
-                    Decode.at [ "taskDigest" ] <|
+                digestCacheDecoder =
+                    Decode.at [ "cacheDigest" ] <|
                         Decode.string
             in
-            case Decode.decodeValue digestDecoder jsonUser of
-                Ok backendTaskDigest ->
+            case Decode.decodeValue digestCacheDecoder jsonUser of
+                Ok backendCacheDigest ->
                     let
-                        currentTaskDigest =
-                            generateTaskDigest model.tasks
+                        currentCacheDigest =
+                            generateCacheDigest model.tasks model
                     in
-                    if backendTaskDigest /= currentTaskDigest then
-                        ( model, fetchTasks )
+                    if backendCacheDigest /= currentCacheDigest then
+                        ( model
+                        , Cmd.batch [ fetchTasks, fetchTags ]
+                        )
 
                     else
                         ( model, Cmd.none )
@@ -793,7 +798,7 @@ update msg model =
                     in
                     ( { model | tasks = tasks }
                     , -- report new state of task list to backend
-                      updateTaskDigest <| Encode.string (generateTaskDigest tasks)
+                      updateCacheDigest <| Encode.string (generateCacheDigest tasks model)
                     )
 
                 Err err ->
@@ -830,7 +835,7 @@ update msg model =
                         , Task.perform DemoIdTick Time.now
 
                         -- report new state of task list to backend
-                        , updateTaskDigest <| Encode.string (generateTaskDigest tasks)
+                        , updateCacheDigest <| Encode.string (generateCacheDigest tasks model)
                         ]
                     )
 
@@ -955,7 +960,8 @@ update msg model =
                                 (BitFlags.initSettings { bitLimit = 25, flags = tags })
                         , tagResourcesLoaded = True
                       }
-                    , Cmd.none
+                      -- inform backend of current cached state
+                    , updateCacheDigest <| Encode.string (generateCacheDigest model.tasks model)
                     )
 
                 Err errMsg ->
