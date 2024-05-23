@@ -386,7 +386,7 @@ update msg model =
         updateCacheDigest newDigest =
             userActions ( "updateCacheDigest", model.taskOwner, Encode.string newDigest )
 
-        -- UPDATE RAILWAY PATTERN HELPERS
+        -- UPDATE HELPERS WITH RAILWAY PATTERN
         adjustDate : ( Model, List (Cmd Msg) ) -> ( Model, List (Cmd Msg) )
         adjustDate ( m, lc ) =
             let
@@ -395,14 +395,14 @@ update msg model =
             in
             ( { m | currentDate = newDate }, lc )
 
-        checkCacheDigest : ( Model, List (Cmd Msg) ) -> ( Model, List (Cmd Msg) )
-        checkCacheDigest ( m, lc ) =
+        maybeCheckCacheDigest : ( Model, List (Cmd Msg) ) -> ( Model, List (Cmd Msg) )
+        maybeCheckCacheDigest ( m, lc ) =
             let
                 timeSinceLastCacheCheck =
                     Time.posixToMillis m.receivedCurrentTimeAt - Time.posixToMillis m.lastCacheCheckAt
             in
-            -- check cache every five minutes
-            if timeSinceLastCacheCheck > (5 * 60000) then
+            -- check cache every twenty minutes
+            if timeSinceLastCacheCheck > (20 * 60000) then
                 ( { m | lastCacheCheckAt = m.receivedCurrentTimeAt }, fetchCacheDigest :: lc )
 
             else
@@ -816,14 +816,14 @@ update msg model =
         ReceivedCurrentTime time ->
             ( { model | receivedCurrentTimeAt = time }, [] )
                 |> adjustDate
-                |> checkCacheDigest
+                |> maybeCheckCacheDigest
                 |> batchCmdList
 
         VisibilityChanged visibility ->
             case visibility of
                 Visible ->
                     ( model, [] )
-                        |> checkCacheDigest
+                        |> maybeCheckCacheDigest
                         |> batchCmdList
 
                 Hidden ->
