@@ -395,15 +395,15 @@ update msg model =
             in
             ( { m | currentDate = newDate }, lc )
 
-        maybeCheckCacheDigest : ( Model, List (Cmd Msg) ) -> ( Model, List (Cmd Msg) )
-        maybeCheckCacheDigest ( m, lc ) =
+        maybeFetchCacheDigestAfterXMinutes : Int -> ( Model, List (Cmd Msg) ) -> ( Model, List (Cmd Msg) )
+        maybeFetchCacheDigestAfterXMinutes minutes ( m, lc ) =
             let
                 timeSinceLastCacheCheck =
                     Time.posixToMillis m.receivedCurrentTimeAt - Time.posixToMillis m.lastCacheCheckAt
             in
-            -- check cache every twenty minutes
-            if timeSinceLastCacheCheck > (20 * 60000) then
-                ( { m | lastCacheCheckAt = m.receivedCurrentTimeAt }, fetchCacheDigest :: lc )
+            -- fetch cache digest every X minutes
+            if timeSinceLastCacheCheck > (minutes * 60000) then
+                ( m, fetchCacheDigest :: lc )
 
             else
                 ( m, lc )
@@ -469,7 +469,7 @@ update msg model =
                             generateCacheDigest model.tasks model
                     in
                     if backendCacheDigest /= currentCacheDigest then
-                        ( model
+                        ( { model | lastCacheCheckAt = model.receivedCurrentTimeAt }
                         , Cmd.batch [ fetchTasks, fetchTags ]
                         )
 
@@ -816,14 +816,14 @@ update msg model =
         ReceivedCurrentTime time ->
             ( { model | receivedCurrentTimeAt = time }, [] )
                 |> adjustDate
-                |> maybeCheckCacheDigest
+                |> maybeFetchCacheDigestAfterXMinutes 20
                 |> batchCmdList
 
         VisibilityChanged visibility ->
             case visibility of
                 Visible ->
                     ( model, [] )
-                        |> maybeCheckCacheDigest
+                        |> maybeFetchCacheDigestAfterXMinutes 5
                         |> batchCmdList
 
                 Hidden ->
