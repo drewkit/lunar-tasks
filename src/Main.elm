@@ -2,6 +2,7 @@ port module Main exposing (..)
 
 import BitFlags exposing (BitFlagSettings)
 import Browser
+import Browser.Events exposing (Visibility(..), onVisibilityChange)
 import Date exposing (Date, Unit(..))
 import DatePicker exposing (defaultSettings)
 import Element exposing (..)
@@ -54,7 +55,7 @@ subscriptions _ =
         [ messageReceiver Recv
         , Keyboard.downs ProcessDownKeys
         , Time.every 60000 ReceivedCurrentTime
-        , Time.every (5 * 60000) FetchCacheDigest
+        , onVisibilityChange VisibilityChanged
         ]
 
 
@@ -103,6 +104,8 @@ type alias Model =
     , tagSearchBoxText : String
     , tagSearchBoxSelected : Maybe String
     , tagResourcesLoaded : Bool
+    , lastCacheCheckAt : Time.Posix
+    , receivedCurrentTimeAt : Time.Posix
     }
 
 
@@ -243,6 +246,9 @@ init currentTimeinMillis validAuth =
         currentDate =
             Date.fromPosix currentZone (Time.millisToPosix currentTimeinMillis)
 
+        currentTime =
+            Time.millisToPosix currentTimeinMillis
+
         ( newDatePicker, datePickerCmd ) =
             DatePicker.init
 
@@ -272,6 +278,8 @@ init currentTimeinMillis validAuth =
             , tagSearchBoxText = ""
             , tagSearchBoxSelected = Nothing
             , tagResourcesLoaded = False
+            , lastCacheCheckAt = currentTime
+            , receivedCurrentTimeAt = currentTime
             }
     in
     ( model
@@ -296,7 +304,6 @@ type Msg
     | SelectTagToEdit (Maybe String)
     | DeleteTag String
     | UpdatedTagNameInput String
-    | FetchCacheDigest Time.Posix
     | CompareCacheDigest Decode.Value
     | CreateTag
     | UpdateTag String
@@ -331,6 +338,7 @@ type Msg
     | ReceivedCurrentTime Time.Posix
     | TaskUpdated Decode.Value
     | TaskDeleted Decode.Value
+    | VisibilityChanged Visibility
     | LogOutUser Int
     | LoadTasks Decode.Value
     | LoadTags Decode.Value
@@ -345,29 +353,64 @@ type Msg
 update : Msg -> Model -> ( Model, Cmd Msg )
 update msg model =
     let
+        -- PORT HELPERS
+        createTask : Encode.Value -> Cmd msg
         createTask encodedTask =
             taskAction ( "create", encodedTask )
 
+        updateTask : Encode.Value -> Cmd msg
         updateTask encodedTask =
             taskAction ( "update", encodedTask )
 
+        deleteTask : Encode.Value -> Cmd msg
         deleteTask encodedTask =
             taskAction ( "delete", encodedTask )
 
+        fetchTasks : Cmd msg
         fetchTasks =
             taskAction ( "fetch", Encode.null )
 
+        fetchTags : Cmd msg
         fetchTags =
             userActions ( "fetchTags", model.taskOwner, Encode.null )
 
+        updateTags : Encode.Value -> Cmd msg
         updateTags encodedTags =
             userActions ( "updateTags", model.taskOwner, encodedTags )
 
+        fetchCacheDigest : Cmd msg
         fetchCacheDigest =
             userActions ( "fetchCacheDigest", model.taskOwner, Encode.null )
 
+        updateCacheDigest : String -> Cmd msg
         updateCacheDigest newDigest =
-            userActions ( "updateCacheDigest", model.taskOwner, newDigest )
+            userActions ( "updateCacheDigest", model.taskOwner, Encode.string newDigest )
+
+        -- UPDATE RAILWAY PATTERN HELPERS
+        adjustDate : ( Model, List (Cmd Msg) ) -> ( Model, List (Cmd Msg) )
+        adjustDate ( m, lc ) =
+            let
+                newDate =
+                    Date.fromPosix m.currentZone m.receivedCurrentTimeAt
+            in
+            ( { m | currentDate = newDate }, lc )
+
+        checkCacheDigest : ( Model, List (Cmd Msg) ) -> ( Model, List (Cmd Msg) )
+        checkCacheDigest ( m, lc ) =
+            let
+                timeSinceLastCacheCheck =
+                    Time.posixToMillis m.receivedCurrentTimeAt - Time.posixToMillis m.lastCacheCheckAt
+            in
+            -- check cache every five minutes
+            if timeSinceLastCacheCheck > (5 * 60000) then
+                ( { m | lastCacheCheckAt = m.receivedCurrentTimeAt }, fetchCacheDigest :: lc )
+
+            else
+                ( m, lc )
+
+        batchCmdList : ( Model, List (Cmd Msg) ) -> ( Model, Cmd Msg )
+        batchCmdList ( m, lc ) =
+            ( m, Cmd.batch lc )
     in
     case msg of
         Recv data ->
@@ -396,8 +439,8 @@ update msg model =
                 "cacheDigestFetched" ->
                     update (CompareCacheDigest data.payload) model
 
-                _ ->
-                    update (LoadTasks Encode.null) { model | banner = "Recv data unrecognized" }
+                unknownMessage ->
+                    update (LoadTasks Encode.null) { model | banner = "Recv data unrecognized: " ++ unknownMessage }
 
         ToggleTag tag ->
             ( model |> toggleTag tag, Cmd.none )
@@ -412,9 +455,6 @@ update msg model =
 
                 Nothing ->
                     ( { model | view = LoadedTasks (TagSettingsView Nothing), tagNameInput = "" }, Cmd.none )
-
-        FetchCacheDigest _ ->
-            ( model, fetchCacheDigest )
 
         CompareCacheDigest jsonUser ->
             let
@@ -774,20 +814,20 @@ update msg model =
             ( { model | currentZone = newZone }, Cmd.none )
 
         ReceivedCurrentTime time ->
-            let
-                newDate =
-                    Date.fromPosix model.currentZone time
-            in
-            if newDate /= model.currentDate then
-                ( { model
-                    | currentDate = newDate
-                    , newTaskCompletedAt = newDate
-                  }
-                , Time.here |> Task.perform AdjustTimeZone
-                )
+            ( { model | receivedCurrentTimeAt = time }, [] )
+                |> adjustDate
+                |> checkCacheDigest
+                |> batchCmdList
 
-            else
-                ( model, Cmd.none )
+        VisibilityChanged visibility ->
+            case visibility of
+                Visible ->
+                    ( model, [] )
+                        |> checkCacheDigest
+                        |> batchCmdList
+
+                Hidden ->
+                    ( model, Cmd.none )
 
         TaskDeleted jsonTask ->
             case Decode.decodeValue lunarTaskDecoder jsonTask of
@@ -798,7 +838,7 @@ update msg model =
                     in
                     ( { model | tasks = tasks }
                     , -- report new state of task list to backend
-                      updateCacheDigest <| Encode.string (generateCacheDigest tasks model)
+                      updateCacheDigest (generateCacheDigest tasks model)
                     )
 
                 Err err ->
@@ -835,7 +875,7 @@ update msg model =
                         , Task.perform DemoIdTick Time.now
 
                         -- report new state of task list to backend
-                        , updateCacheDigest <| Encode.string (generateCacheDigest tasks model)
+                        , updateCacheDigest <| generateCacheDigest tasks model
                         ]
                     )
 
@@ -961,7 +1001,7 @@ update msg model =
                         , tagResourcesLoaded = True
                       }
                       -- inform backend of current cached state
-                    , updateCacheDigest <| Encode.string (generateCacheDigest model.tasks model)
+                    , updateCacheDigest <| generateCacheDigest model.tasks model
                     )
 
                 Err errMsg ->
