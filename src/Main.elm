@@ -402,7 +402,7 @@ update msg model =
                     Time.posixToMillis m.receivedCurrentTimeAt - Time.posixToMillis m.lastCacheCheckAt
             in
             -- fetch cache digest every X minutes
-            if timeSinceLastCacheCheck > (minutes * 60000) then
+            if timeSinceLastCacheCheck > (minutes * 60000) && not m.demo then
                 ( m, fetchCacheDigest :: lc )
 
             else
