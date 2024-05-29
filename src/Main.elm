@@ -1824,6 +1824,8 @@ viewTaskTable currentDate tasks =
                             [ Html.text task.title ]
                         , pastDueTd
                         , td []
+                            [ Html.text <| String.fromInt task.period ]
+                        , td []
                             [ Html.text <| Date.toIsoString (getLastCompletedAt task) ]
                         , td
                             [ Html.Attributes.style "cursor" "pointer"
@@ -1868,6 +1870,7 @@ viewTaskTable currentDate tasks =
                         [ th [ Html.Attributes.style "text-align" "left" ]
                             [ Html.text "Task" ]
                         , th [ Html.Attributes.style "text-align" "left" ] [ Html.text "Days Past Due" ]
+                        , th [ Html.Attributes.style "text-align" "left" ] [ Html.text "Cadence" ]
                         , th [ Html.Attributes.style "text-align" "left" ]
                             [ Html.text "Last Completed" ]
                         , th [] [ Html.text "" ]
