@@ -467,14 +467,17 @@ update msg model =
                     let
                         currentCacheDigest =
                             generateCacheDigest model.tasks model
-                    in
-                    if backendCacheDigest /= currentCacheDigest then
-                        ( { model | lastCacheCheckAt = model.receivedCurrentTimeAt }
-                        , Cmd.batch [ fetchTasks, fetchTags ]
-                        )
 
-                    else
-                        ( model, Cmd.none )
+                        commands =
+                            if backendCacheDigest /= currentCacheDigest then
+                                Cmd.batch [ fetchTasks, fetchTags ]
+
+                            else
+                                Cmd.none
+                    in
+                    ( { model | lastCacheCheckAt = model.receivedCurrentTimeAt }
+                    , commands
+                    )
 
                 Err _ ->
                     ( model, Cmd.none )
