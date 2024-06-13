@@ -2,9 +2,11 @@ module Tests exposing (..)
 
 import Date
 import Expect
-import LunarTask exposing (getLastCompletedAt, markTaskCompleted)
+import Html exposing (time)
+import LunarTask exposing (getLastCompletedAt, markTaskCompleted, pastDue)
 import Main exposing (..)
 import Test exposing (..)
+import Time
 
 
 suite : Test
@@ -46,4 +48,27 @@ suite =
                             (Just <| Date.fromOrdinalDate 2023 21)
                 in
                 Expect.equal (getLastCompletedAt taskWithOneMoreCompletionEntry) (Date.fromOrdinalDate 2023 21)
+        , test "with the start of a new day, a task transitions to a past due state" <|
+            \_ ->
+                let
+                    prevTime =
+                        Time.millisToPosix 1711211815576
+
+                    dayLaterTime =
+                        Time.millisToPosix (1711211815576 + (10000 * 60 * 60 * 24))
+
+                    taskThatIsPastDueInOneDay =
+                        LunarTask.genTaskWithOptions
+                            { period = 1
+                            , lastCompletion = Date.fromPosix Time.utc prevTime
+                            }
+
+                    ( dayLaterModel, _ ) =
+                        update (ReceivedCurrentTime dayLaterTime) testModel
+                in
+                Expect.all
+                    [ \task -> Expect.notEqual (pastDue testModel.currentDate task) True
+                    , \task -> Expect.equal (pastDue dayLaterModel.currentDate task) True
+                    ]
+                    taskThatIsPastDueInOneDay
         ]

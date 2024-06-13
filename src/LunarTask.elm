@@ -2,6 +2,7 @@ module LunarTask exposing
     ( LunarTask
     , deleteTaskFromList
     , findTaskById
+    , genTaskWithOptions
     , getDaysPastDue
     , getLastCompletedAt
     , insertOrUpdateTask
@@ -221,6 +222,18 @@ entryInfoToDate info =
 
 
 -- Mocked Data
+
+
+genTaskWithOptions : { lastCompletion : Date.Date, period : Int } -> LunarTask
+genTaskWithOptions opts =
+    { taskOwner = "1234567"
+    , title = "task"
+    , bitTags = 0
+    , notes = ""
+    , id = "1234567788"
+    , period = opts.period
+    , completionEntries = [ opts.lastCompletion ]
+    }
 
 
 lunarTaskWithOneHundredCompletionEntries : LunarTask
