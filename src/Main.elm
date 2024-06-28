@@ -425,8 +425,8 @@ update msg model =
             in
             ( { m | currentDate = newDate }, lc )
 
-        maybeFetchCacheDigestAfterXMinutes : Int -> ( Model, List (Cmd Msg) ) -> ( Model, List (Cmd Msg) )
-        maybeFetchCacheDigestAfterXMinutes minutes ( m, lc ) =
+        fetchCacheDigestIfXMinutesSinceCheck : Int -> ( Model, List (Cmd Msg) ) -> ( Model, List (Cmd Msg) )
+        fetchCacheDigestIfXMinutesSinceCheck minutes ( m, lc ) =
             let
                 timeSinceLastCacheCheck =
                     Time.posixToMillis m.receivedCurrentTimeAt - Time.posixToMillis m.lastCacheCheckAt
@@ -852,14 +852,14 @@ update msg model =
         ReceivedCurrentTime time ->
             ( { model | receivedCurrentTimeAt = time }, [] )
                 |> adjustDate
-                |> maybeFetchCacheDigestAfterXMinutes 20
+                |> fetchCacheDigestIfXMinutesSinceCheck 20
                 |> batchCmdList
 
         VisibilityChanged visibility ->
             case visibility of
                 Visible ->
                     ( model, [] )
-                        |> maybeFetchCacheDigestAfterXMinutes 5
+                        |> fetchCacheDigestIfXMinutesSinceCheck 5
                         |> batchCmdList
 
                 Hidden ->
