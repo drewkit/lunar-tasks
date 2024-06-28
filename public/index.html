@@ -59,6 +59,21 @@
       };
     });
 
+    app.ports.localStoreAction.subscribe(function(args) {
+      var storeKey = "lunartasks-data";
+      var [action, payload] = args
+      var storedData = localStorage.getItem(storeKey);
+      var lunartasksData = storedData ? JSON.parse(storedData) : null;
+
+      if (action == "fetch") {
+        app.ports.messageReceiver.send({tag: "localStoreFetched", payload: lunartasksData})
+      } else if (action == "set") {
+        localStorage.setItem(storeKey, JSON.stringify(payload))
+      } else if (action = "clear") {
+        localStorage.setItem(storeKey, JSON.stringify(null))
+      };
+    });
+
     app.ports.taskAction.subscribe(function(args) {
       var [action, task] = args
       if (action == "create") {

@@ -75,6 +75,9 @@ port messageReceiver : ({ tag : String, payload : Decode.Value } -> msg) -> Sub 
 port userLoginAction : String -> Cmd msg
 
 
+port localStoreAction : ( String, Encode.Value ) -> Cmd msg
+
+
 
 -- MODEL
 
@@ -125,6 +128,32 @@ type ViewState
 
 
 -- MISC DECODING / ENCODING
+
+
+type alias LocalStore =
+    { tasks : List LunarTask
+    , taskOwner : String
+    , bitFlags : BitFlagSettings
+    }
+
+
+localStoreDecoder : Decoder LocalStore
+localStoreDecoder =
+    Decode.map3 LocalStore
+        (Decode.field "tasks" (Decode.list lunarTaskDecoder))
+        (Decode.field "taskOwner" Decode.string)
+        (Decode.field "bitFlags" (Decode.list Decode.string)
+            |> Decode.map (\l -> Result.withDefault (BitFlags.defaultSettings 25) (BitFlags.initSettings { bitLimit = 25, flags = l }))
+        )
+
+
+localStoreEncoder : Model -> Encode.Value
+localStoreEncoder model =
+    Encode.object
+        [ ( "tasks", Encode.list lunarTaskEncoder model.tasks )
+        , ( "taskOwner", Encode.string model.taskOwner )
+        , ( "bitFlags", Encode.list Encode.string (BitFlags.serialize model.tagSettings) )
+        ]
 
 
 taskTagsDecoder : Decoder (List String)
@@ -203,7 +232,7 @@ generateCacheDigest tasks model =
     let
         tags =
             model.tagSettings
-                |> BitFlags.allFlags
+                |> BitFlags.serialize
                 |> String.join ","
     in
     tasks
@@ -311,6 +340,7 @@ type Msg
     | ClearSearch
     | ClearBanner
     | FilterReset
+    | LocalStoreFetched Decode.Value
     | ToggleSortOrder
     | SelectFilter ListFilter
     | SelectSort ListSort
@@ -435,6 +465,9 @@ update msg model =
 
                 "tagsUpdated" ->
                     update (LoadTags data.payload) model
+
+                "localStoreFetched" ->
+                    update (LocalStoreFetched data.payload) model
 
                 "cacheDigestFetched" ->
                     update (CompareCacheDigest data.payload) model
@@ -838,10 +871,17 @@ update msg model =
                     let
                         tasks =
                             deleteTaskFromList task.id model.tasks
+
+                        modelWithTaskRemoved =
+                            { model | tasks = tasks }
                     in
-                    ( { model | tasks = tasks }
-                    , -- report new state of task list to backend
-                      updateCacheDigest (generateCacheDigest tasks model)
+                    ( modelWithTaskRemoved
+                    , Cmd.batch
+                        [ -- report new state of task list to backend
+                          updateCacheDigest (generateCacheDigest tasks modelWithTaskRemoved)
+                        , -- update localStore
+                          localStoreAction ( "set", localStoreEncoder modelWithTaskRemoved )
+                        ]
                     )
 
                 Err err ->
@@ -866,10 +906,12 @@ update msg model =
                     let
                         tasks =
                             insertOrUpdateTask task model.tasks
+
+                        modelWithUpdatedTask =
+                            { model | tasks = tasks }
                     in
-                    ( { model
+                    ( { modelWithUpdatedTask
                         | banner = "task \"" ++ task.title ++ "\" -- id  " ++ task.id ++ " touched by db"
-                        , tasks = tasks
                       }
                     , Cmd.batch
                         [ delay 5000 ClearBanner
@@ -878,7 +920,10 @@ update msg model =
                         , Task.perform DemoIdTick Time.now
 
                         -- report new state of task list to backend
-                        , updateCacheDigest <| generateCacheDigest tasks model
+                        , updateCacheDigest <| generateCacheDigest tasks modelWithUpdatedTask
+
+                        -- update localStore
+                        , localStoreAction ( "set", localStoreEncoder modelWithUpdatedTask )
                         ]
                     )
 
@@ -936,7 +981,7 @@ update msg model =
                         | taskOwner = taskOwnerId
                         , view = LoadingTasksView
                       }
-                    , Cmd.batch [ fetchTasks, fetchTags ]
+                    , Cmd.batch [ localStoreAction ( "fetch", Encode.null ) ]
                     )
 
                 Err errMsg ->
@@ -959,11 +1004,15 @@ update msg model =
                     jsonTasks
             of
                 Ok tasks ->
-                    ( { model
-                        | tasks = tasks
-                        , view = LoadedTasks LoadedTasksView
-                      }
-                    , Cmd.none
+                    let
+                        loadedTasksModel =
+                            { model
+                                | tasks = tasks
+                                , view = LoadedTasks LoadedTasksView
+                            }
+                    in
+                    ( loadedTasksModel
+                    , localStoreAction ( "set", localStoreEncoder loadedTasksModel )
                     )
 
                 Err errMsg ->
@@ -996,15 +1045,24 @@ update msg model =
                     jsonTags
             of
                 Ok tags ->
-                    ( { model
-                        | tagSettings =
-                            Result.withDefault
-                                model.tagSettings
-                                (BitFlags.initSettings { bitLimit = 25, flags = tags })
-                        , tagResourcesLoaded = True
-                      }
-                      -- inform backend of current cached state
-                    , updateCacheDigest <| generateCacheDigest model.tasks model
+                    let
+                        modelWithLoadedTags =
+                            { model
+                                | tagSettings =
+                                    Result.withDefault
+                                        model.tagSettings
+                                        (BitFlags.initSettings { bitLimit = 25, flags = tags })
+                                , tagResourcesLoaded = True
+                            }
+                    in
+                    ( modelWithLoadedTags
+                    , Cmd.batch
+                        [ -- inform backend of current cached state
+                          updateCacheDigest <| generateCacheDigest model.tasks modelWithLoadedTags
+
+                        -- update local store
+                        , localStoreAction ( "set", localStoreEncoder modelWithLoadedTags )
+                        ]
                     )
 
                 Err errMsg ->
@@ -1021,6 +1079,25 @@ update msg model =
 
                 _ ->
                     ( model, Cmd.none )
+
+        LocalStoreFetched jsonResp ->
+            case Decode.decodeValue localStoreDecoder jsonResp of
+                Ok localStore ->
+                    if model.taskOwner == localStore.taskOwner then
+                        ( { model
+                            | view = LoadedTasks LoadedTasksView
+                            , tasks = localStore.tasks
+                            , tagSettings = localStore.bitFlags
+                            , tagResourcesLoaded = True
+                          }
+                        , fetchCacheDigest
+                        )
+
+                    else
+                        ( { model | banner = "taskOwner not matching with local store" }, Cmd.batch [ fetchTasks, fetchTags ] )
+
+                Err errMsg ->
+                    ( { model | banner = Decode.errorToString errMsg }, Cmd.batch [ fetchTasks, fetchTags ] )
 
         ReturnToMain ->
             case model.view of
