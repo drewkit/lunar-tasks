@@ -99,8 +99,7 @@ type alias Model =
     , banner : String
     , editedTask : Maybe LunarTask
     , tagSettings : BitFlagSettings
-    , demo : Bool
-    , demoId : Int
+    , demo : Maybe { demoId : Int }
     , datePicker : DatePicker.DatePicker
     , tagNameInput : String
     , tagSearchBox : SearchBox.State
@@ -127,7 +126,7 @@ type ViewState
 
 
 
--- MISC DECODING / ENCODING
+-- LOCAL STORE
 
 
 type alias LocalStore =
@@ -154,6 +153,30 @@ localStoreEncoder model =
         , ( "taskOwner", Encode.string model.taskOwner )
         , ( "bitFlags", Encode.list Encode.string (BitFlags.serialize model.tagSettings) )
         ]
+
+
+
+-- CACHE DIGEST
+
+
+generateCacheDigest : List LunarTask -> Model -> String
+generateCacheDigest tasks model =
+    let
+        tags =
+            model.tagSettings
+                |> BitFlags.serialize
+                |> String.join ","
+    in
+    tasks
+        |> Encode.list lunarTaskEncoder
+        |> Encode.encode 0
+        |> (++) tags
+        |> SHA1.fromString
+        |> SHA1.toHex
+
+
+
+-- MISC DECODING / ENCODING
 
 
 taskTagsDecoder : Decoder (List String)
@@ -191,7 +214,7 @@ type alias LoginAttributes r =
         | tasks : List LunarTask
         , taskOwner : String
         , view : ViewState
-        , demo : Bool
+        , demo : Maybe { demoId : Int }
         , tagSettings : BitFlagSettings
         , banner : String
         , tagResourcesLoaded : Bool
@@ -202,7 +225,7 @@ resetLogin : LoginAttributes r -> LoginAttributes r
 resetLogin attrs =
     { attrs
         | tasks = []
-        , demo = False
+        , demo = Nothing
         , taskOwner = ""
         , view = LoginPrompt
         , tagSettings = BitFlags.defaultSettings 25
@@ -221,26 +244,6 @@ datePickerSettings =
             , style "text-align" "center"
             ]
     }
-
-
-
--- CACHE DIGEST
-
-
-generateCacheDigest : List LunarTask -> Model -> String
-generateCacheDigest tasks model =
-    let
-        tags =
-            model.tagSettings
-                |> BitFlags.serialize
-                |> String.join ","
-    in
-    tasks
-        |> Encode.list lunarTaskEncoder
-        |> Encode.encode 0
-        |> (++) tags
-        |> SHA1.fromString
-        |> SHA1.toHex
 
 
 
@@ -300,8 +303,7 @@ init currentTimeinMillis validAuth =
             , newTaskCompletedAt = currentDate
             , banner = ""
             , editedTask = Nothing
-            , demo = False
-            , demoId = 0
+            , demo = Nothing
             , tagNameInput = ""
             , tagSearchBox = SearchBox.init
             , tagSearchBoxText = ""
@@ -316,7 +318,6 @@ init currentTimeinMillis validAuth =
         [ loginCmd
         , Time.now |> Task.perform ReceivedCurrentTime
         , Time.here |> Task.perform AdjustTimeZone
-        , Task.perform DemoIdTick Time.now
         , Cmd.map NewTaskSetDatePicker datePickerCmd
         ]
     )
@@ -432,7 +433,7 @@ update msg model =
                     Time.posixToMillis m.receivedCurrentTimeAt - Time.posixToMillis m.lastCacheCheckAt
             in
             -- fetch cache digest every X minutes
-            if timeSinceLastCacheCheck > (minutes * 60000) && not m.demo then
+            if timeSinceLastCacheCheck > (minutes * 60000) && not (isPresent m.demo) then
                 ( m, fetchCacheDigest :: lc )
 
             else
@@ -520,7 +521,7 @@ update msg model =
                 addedToTagSettings =
                     BitFlags.createFlag model.tagNameInput model.tagSettings
             in
-            if model.demo then
+            if isPresent model.demo then
                 case addedToTagSettings of
                     Ok updatedSettings ->
                         ( { model | tagNameInput = "", tagSettings = updatedSettings }, Cmd.none )
@@ -541,7 +542,7 @@ update msg model =
                 updatedTagSettings =
                     BitFlags.updateFlag oldName model.tagNameInput model.tagSettings
             in
-            if model.demo then
+            if isPresent model.demo then
                 ( { model | tagSettings = updatedTagSettings, view = LoadedTasks (TagSettingsView Nothing) }, Cmd.none )
 
             else
@@ -552,7 +553,7 @@ update msg model =
                 updatedTagSettings =
                     BitFlags.deleteFlag tagName model.tagSettings
             in
-            if model.demo then
+            if isPresent model.demo then
                 ( { model | tagSettings = updatedTagSettings, view = LoadedTasks (TagSettingsView Nothing) }, Cmd.none )
 
             else
@@ -594,7 +595,7 @@ update msg model =
                 jsonTaskMarkedCompleted =
                     lunarTaskEncoder <| markTaskCompleted task (Just entryDate)
             in
-            if model.demo then
+            if isPresent model.demo then
                 update (TaskUpdated jsonTaskMarkedCompleted) model
 
             else
@@ -635,7 +636,7 @@ update msg model =
                             Maybe.withDefault fakeTask (findTaskById editedTask.id model.tasks)
                     in
                     if originalTask /= editedTask then
-                        if model.demo then
+                        if isPresent model.demo then
                             update (TaskUpdated (lunarTaskEncoder editedTask))
                                 { model
                                     | editedTask = Nothing
@@ -709,7 +710,7 @@ update msg model =
                 modelWithNewTaskReset =
                     resetNewTask model
             in
-            if model.demo then
+            if isPresent model.demo then
                 update (TaskUpdated encodedJsonTask) modelWithNewTaskReset
 
             else
@@ -819,7 +820,7 @@ update msg model =
                 encodedLunarTask =
                     lunarTaskEncoder task
             in
-            if model.demo then
+            if isPresent model.demo then
                 update (TaskDeleted encodedLunarTask) model
 
             else
@@ -944,13 +945,16 @@ update msg model =
             in
             ( { model
                 | view = LoadingTasksView
-                , demo = True
+                , demo = Just { demoId = 1 }
                 , taskOwner = "demoTaskOwnerId"
                 , tagSettings =
                     Result.withDefault (BitFlags.defaultSettings 25) flagSettingsResult
                 , tagResourcesLoaded = True
               }
-            , Http.get { url = "/demo-data.json", expect = Http.expectString LoadDemo }
+            , Cmd.batch
+                [ Http.get { url = "/demo-data.json", expect = Http.expectString LoadDemo }
+                , Task.perform DemoIdTick Time.now
+                ]
             )
 
         LoadDemo result ->
@@ -993,9 +997,13 @@ update msg model =
                     )
 
         DemoIdTick posixTime ->
-            ( { model | demoId = Time.posixToMillis posixTime }
-            , Cmd.none
-            )
+            if isPresent model.demo then
+                ( { model | demo = Just { demoId = Time.posixToMillis posixTime } }
+                , Cmd.none
+                )
+
+            else
+                ( model, Cmd.none )
 
         LoadTasks jsonTasks ->
             case
@@ -1209,7 +1217,7 @@ viewLayout model innerContent =
     layout
         [ width fill
         , height fill
-        , inFront (viewDemoModeBanner model.demo)
+        , inFront (viewDemoModeBanner <| isPresent model.demo)
         , Font.family
             [ Font.typeface "Times New Roman"
             , Font.serif
@@ -2083,3 +2091,17 @@ viewNewTask model =
                 ]
             , viewNewTaskCreateBtn model
             ]
+
+
+
+-- MISC HELPERS
+
+
+isPresent : Maybe a -> Bool
+isPresent item =
+    case item of
+        Nothing ->
+            False
+
+        Just _ ->
+            True

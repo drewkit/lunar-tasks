@@ -2,7 +2,6 @@ module Tests exposing (..)
 
 import Date
 import Expect
-import Html exposing (time)
 import LunarTask exposing (getLastCompletedAt, markTaskCompleted, pastDue)
 import Main exposing (..)
 import Test exposing (..)
@@ -21,7 +20,7 @@ suite =
                 let
                     demoModel =
                         { testModel
-                            | demo = True
+                            | demo = Just { demoId = 1 }
                             , newTaskTitle = "test new task"
                             , newTaskPeriod = 15
                         }

@@ -15,8 +15,7 @@ type alias NewLunarTask r =
         , newTaskTitle : String
         , newTaskPeriod : Int
         , newTaskCompletedAt : Date.Date
-        , demo : Bool
-        , demoId : Int
+        , demo : Maybe { demoId : Int }
         , currentDate : Date.Date
         , newTaskNotes : String
     }
@@ -76,22 +75,23 @@ newLunarTaskEncoder task =
                   ]
                 ]
     in
-    if task.demo then
-        Encode.object
-            [ ( "taskOwner", Encode.string task.taskOwner )
-            , ( "title", Encode.string task.newTaskTitle )
-            , ( "period", Encode.int task.newTaskPeriod )
-            , ( "notes", Encode.string task.newTaskNotes )
-            , ( "completionEntries", completionEntries )
-            , ( "id", Encode.string (String.fromInt task.demoId) )
-            , ( "bitTags", Encode.int 0 )
-            ]
+    case task.demo of
+        Just demoData ->
+            Encode.object
+                [ ( "taskOwner", Encode.string task.taskOwner )
+                , ( "title", Encode.string task.newTaskTitle )
+                , ( "period", Encode.int task.newTaskPeriod )
+                , ( "notes", Encode.string task.newTaskNotes )
+                , ( "completionEntries", completionEntries )
+                , ( "id", Encode.string (String.fromInt demoData.demoId) )
+                , ( "bitTags", Encode.int 0 )
+                ]
 
-    else
-        Encode.object
-            [ ( "taskOwner", Encode.string task.taskOwner )
-            , ( "title", Encode.string task.newTaskTitle )
-            , ( "period", Encode.int task.newTaskPeriod )
-            , ( "notes", Encode.string task.newTaskNotes )
-            , ( "completionEntries", completionEntries )
-            ]
+        Nothing ->
+            Encode.object
+                [ ( "taskOwner", Encode.string task.taskOwner )
+                , ( "title", Encode.string task.newTaskTitle )
+                , ( "period", Encode.int task.newTaskPeriod )
+                , ( "notes", Encode.string task.newTaskNotes )
+                , ( "completionEntries", completionEntries )
+                ]
