@@ -251,6 +251,48 @@ sortTaskList sortType currentDate tasks =
 -- HELPERS
 
 
+sortOrderFromListSort : ListSort -> SortOrder
+sortOrderFromListSort listSort =
+    case listSort of
+        SortPastDueDays sortOrder ->
+            sortOrder
+
+        SortPastDuePeriods sortOrder ->
+            sortOrder
+
+        SortLastCompleted sortOrder ->
+            sortOrder
+
+        NoSort sortOrder ->
+            sortOrder
+
+
+isComplementarySortOrder : SortOrder -> ListSort -> Bool
+isComplementarySortOrder sortOrder listSort =
+    sortOrder /= sortOrderFromListSort listSort
+
+
+isMatchingSortOrder : SortOrder -> ListSort -> Bool
+isMatchingSortOrder sortOrder listSort =
+    sortOrder == sortOrderFromListSort listSort
+
+
+listSortToText : ListSort -> String
+listSortToText listSort =
+    case listSort of
+        SortPastDueDays _ ->
+            "Days Past Due"
+
+        SortPastDuePeriods _ ->
+            "Periods Lapsed"
+
+        SortLastCompleted _ ->
+            "Last Completed"
+
+        NoSort _ ->
+            "Created At"
+
+
 flipOrder : ListSort -> ListSort
 flipOrder listSort =
     let

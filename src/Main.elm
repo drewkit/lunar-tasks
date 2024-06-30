@@ -1642,14 +1642,29 @@ viewLandingPage =
         ]
 
 
-radioOption : String -> Input.OptionState -> Element msg
-radioOption label state =
+generateSortRowRadioOptions : ListSort -> List (Input.Option ListSort msg)
+generateSortRowRadioOptions listSort =
+    [ SortPastDueDays DESC
+    , SortPastDueDays ASC
+    , SortLastCompleted DESC
+    , SortLastCompleted ASC
+    , SortPastDuePeriods DESC
+    , SortPastDuePeriods ASC
+    , NoSort ASC
+    , NoSort DESC
+    ]
+        |> List.filter (isMatchingSortOrder (sortOrderFromListSort listSort))
+        |> List.map (\x -> Input.optionWith x <| radioOption (listSortToText x) (Just <| sortOrderFromListSort listSort))
+
+
+radioOption : String -> Maybe SortOrder -> Input.OptionState -> Element msg
+radioOption label maybeSortOrder state =
     row [ spacing 10 ]
         [ el
             [ width <| px 30
             , height <| px 30
             , centerY
-            , padding 4
+            , padding 1
             , Border.rounded 6
             , Border.width 2
             , Border.color <| rgb255 0xC0 0xC0 0xC0
@@ -1662,7 +1677,7 @@ radioOption label state =
                 , Background.color <|
                     case state of
                         Input.Idle ->
-                            rgb255 0xFF 0xFF 0xFF
+                            rgba255 0xFF 0xFF 0xFF 0.1
 
                         Input.Focused ->
                             rgba255 0x72 0x9F 0xCF 0.1
@@ -1670,7 +1685,21 @@ radioOption label state =
                         Input.Selected ->
                             color.lightBlue
                 ]
-                none
+                (case state of
+                    Input.Selected ->
+                        case maybeSortOrder of
+                            Nothing ->
+                                Element.none
+
+                            Just ASC ->
+                                Icon.trendingUp |> Icon.toHtml [ Html.Attributes.style "color" "gray" ] |> Element.html
+
+                            Just DESC ->
+                                Icon.trendingDown |> Icon.toHtml [ Html.Attributes.style "color" "gray" ] |> Element.html
+
+                    _ ->
+                        Element.none
+                )
         , text label
         ]
 
@@ -1684,9 +1713,9 @@ viewTaskDiscovery model =
                 , selected = Just model.filter
                 , label = Input.labelLeft [ Font.semiBold, paddingEach { top = 0, left = 0, bottom = 0, right = 15 } ] (text "Filter By: ")
                 , options =
-                    [ Input.optionWith FilterPastDue <| radioOption "Past Due"
-                    , Input.optionWith FilterNonPastDue <| radioOption "Not Past Due"
-                    , Input.optionWith FilterAll <| radioOption "All"
+                    [ Input.optionWith FilterPastDue <| radioOption "Past Due" Nothing
+                    , Input.optionWith FilterNonPastDue <| radioOption "Not Past Due" Nothing
+                    , Input.optionWith FilterAll <| radioOption "All" Nothing
                     ]
                 }
 
@@ -1700,12 +1729,7 @@ viewTaskDiscovery model =
                         , paddingEach { top = 0, left = 0, bottom = 0, right = 15 }
                         ]
                         (text "Sort By: ")
-                , options =
-                    [ Input.optionWith (SortPastDueDays DESC) <| radioOption "Days Past Due"
-                    , Input.optionWith (SortLastCompleted DESC) <| radioOption "Last Completed"
-                    , Input.optionWith (SortPastDuePeriods DESC) <| radioOption "Periods Lapsed"
-                    , Input.optionWith (NoSort DESC) <| radioOption "Default"
-                    ]
+                , options = generateSortRowRadioOptions model.sort
                 }
 
         searchTermInput =
