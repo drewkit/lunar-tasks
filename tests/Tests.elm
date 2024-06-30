@@ -6,13 +6,21 @@ import LunarTask exposing (getLastCompletedAt, markTaskCompleted, pastDue)
 import Main exposing (..)
 import Test exposing (..)
 import Time
+import Url
 
 
 suite : Test
 suite =
     let
         ( testModel, _ ) =
-            init 1711211815576 True
+            initWithoutNavKey ( 1711211815576, True )
+                { protocol = Url.Http
+                , host = "localhost"
+                , port_ = Just 8000
+                , path = "/"
+                , query = Nothing
+                , fragment = Nothing
+                }
     in
     describe "Demo Mode"
         [ test "CreateTask adds task to Model task list" <|

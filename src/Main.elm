@@ -3,6 +3,7 @@ port module Main exposing (..)
 import BitFlags exposing (BitFlagSettings)
 import Browser
 import Browser.Events exposing (Visibility(..), onVisibilityChange)
+import Browser.Navigation as Nav
 import Date exposing (Date, Unit(..))
 import DatePicker exposing (defaultSettings)
 import Element exposing (..)
@@ -29,19 +30,22 @@ import SearchBox
 import Set exposing (Set)
 import Task
 import Time exposing (utc)
+import Url exposing (Url)
 
 
 
 -- MAIN
 
 
-main : Program ( Int, Bool ) Model Msg
+main : Program Flags Model Msg
 main =
-    Browser.element
-        { init = \( a, b ) -> init a b
+    Browser.application
+        { init = init
         , update = update
         , view = view
         , subscriptions = subscriptions
+        , onUrlRequest = UrlRequest
+        , onUrlChange = UrlChanged
         }
 
 
@@ -83,7 +87,8 @@ port localStoreAction : ( String, Encode.Value ) -> Cmd msg
 
 
 type alias Model =
-    { tasks : List LunarTask
+    { url : Url
+    , tasks : List LunarTask
     , taskOwner : String
     , currentDate : Date.Date
     , currentZone : Time.Zone
@@ -255,8 +260,17 @@ currentTags settings =
     BitFlags.allFlags settings
 
 
-init : Int -> Bool -> ( Model, Cmd Msg )
-init currentTimeinMillis validAuth =
+type alias Flags =
+    ( Int, Bool )
+
+
+init : Flags -> Url -> Nav.Key -> ( Model, Cmd Msg )
+init flags url _ =
+    initWithoutNavKey flags url
+
+
+initWithoutNavKey : Flags -> Url -> ( Model, Cmd Msg )
+initWithoutNavKey ( currentTimeinMillis, validAuth ) url =
     let
         loginCmd =
             if validAuth then
@@ -286,7 +300,8 @@ init currentTimeinMillis validAuth =
 
         model : Model
         model =
-            { tasks = []
+            { url = url
+            , tasks = []
             , taskOwner = ""
             , currentDate = currentDate
             , currentZone = currentZone
@@ -379,6 +394,8 @@ type Msg
     | UserLoggedIn Decode.Value
     | DemoIdTick Time.Posix
     | ReturnToMain
+    | UrlRequest Browser.UrlRequest
+    | UrlChanged Url
 
 
 update : Msg -> Model -> ( Model, Cmd Msg )
@@ -1107,6 +1124,14 @@ update msg model =
                 Err errMsg ->
                     ( { model | banner = Decode.errorToString errMsg }, Cmd.batch [ fetchTasks, fetchTags ] )
 
+        UrlChanged url ->
+            -- Debug.todo "not now"
+            ( model, Cmd.none )
+
+        UrlRequest url ->
+            -- Debug.todo "not now"
+            ( model, Cmd.none )
+
         ReturnToMain ->
             case model.view of
                 LoginPrompt ->
@@ -1265,7 +1290,7 @@ viewMoon =
         |> Element.html
 
 
-view : Model -> Html Msg
+view : Model -> Browser.Document Msg
 view model =
     let
         innerContent =
@@ -1291,7 +1316,7 @@ view model =
                 LoadedTasks (TagSettingsView maybeSelectedTag) ->
                     viewTagSettings maybeSelectedTag model
     in
-    viewLayout model innerContent
+    { title = "LunarTasks", body = [ viewLayout model innerContent ] }
 
 
 viewTagSettings : Maybe String -> Model -> Element Msg
