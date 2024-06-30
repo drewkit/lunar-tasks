@@ -2,6 +2,7 @@ module Tests exposing (..)
 
 import Date
 import Expect
+import ListSettings exposing (..)
 import LunarTask exposing (getLastCompletedAt, markTaskCompleted, pastDue)
 import Main exposing (..)
 import Test exposing (..)
@@ -18,12 +19,23 @@ suite =
                 , host = "localhost"
                 , port_ = Just 8000
                 , path = "/"
-                , query = Nothing
+                , query = Just "q=mow%20lawn&filter=pastdue&sort=lastcompleted&sortorder=asc"
                 , fragment = Nothing
                 }
     in
     describe "Demo Mode"
-        [ test "CreateTask adds task to Model task list" <|
+        [ describe "query params"
+            [ test "'mow lawn' in text search" <|
+                \_ ->
+                    Expect.equal (Just "mow lawn") testModel.searchTerm
+            , test "filter by past due" <|
+                \_ ->
+                    Expect.equal testModel.filter FilterPastDue
+            , test "sort by last completed, ascending" <|
+                \_ ->
+                    Expect.equal testModel.sort (SortLastCompleted ASC)
+            ]
+        , test "CreateTask adds task to Model task list" <|
             \_ ->
                 let
                     demoModel =
