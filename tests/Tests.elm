@@ -13,27 +13,46 @@ import Url
 suite : Test
 suite =
     let
+        url =
+            { protocol = Url.Http
+            , host = "localhost"
+            , port_ = Just 8000
+            , path = "/"
+            , query = Just "q=mow%20lawn&filter=pastdue&sort=lastcompleted&sortorder=asc"
+            , fragment = Nothing
+            }
+
         ( testModel, _ ) =
-            initWithoutNavKey ( 1711211815576, True )
-                { protocol = Url.Http
-                , host = "localhost"
-                , port_ = Just 8000
-                , path = "/"
-                , query = Just "q=mow%20lawn&filter=pastdue&sort=lastcompleted&sortorder=asc"
-                , fragment = Nothing
-                }
+            initWithoutNavKey ( 1711211815576, True ) url
+
+        ( modelWithEmptyQueryParams, _ ) =
+            update (UrlChanged { url | query = Nothing }) testModel
     in
     describe "Demo Mode"
         [ describe "query params"
-            [ test "'mow lawn' in text search" <|
-                \_ ->
-                    Expect.equal (Just "mow lawn") testModel.searchTerm
-            , test "filter by past due" <|
-                \_ ->
-                    Expect.equal testModel.filter FilterPastDue
-            , test "sort by last completed, ascending" <|
-                \_ ->
-                    Expect.equal testModel.sort (SortLastCompleted ASC)
+            [ describe "on initialization with loaded query params"
+                [ test "'mow lawn' in text search" <|
+                    \_ ->
+                        Expect.equal (Just "mow lawn") testModel.searchTerm
+                , test "filter by past due" <|
+                    \_ ->
+                        Expect.equal testModel.filter FilterPastDue
+                , test "sort by last completed, ascending" <|
+                    \_ ->
+                        Expect.equal testModel.sort (SortLastCompleted ASC)
+                ]
+            , skip <|
+                describe "with query params removed"
+                    [ test "nothing in text search" <|
+                        \_ ->
+                            Expect.equal Nothing modelWithEmptyQueryParams.searchTerm
+                    , test "filter by All" <|
+                        \_ ->
+                            Expect.equal modelWithEmptyQueryParams.filter FilterAll
+                    , test "sort by NoSort DESC" <|
+                        \_ ->
+                            Expect.equal (NoSort DESC) modelWithEmptyQueryParams.sort
+                    ]
             ]
         , test "CreateTask adds task to Model task list" <|
             \_ ->

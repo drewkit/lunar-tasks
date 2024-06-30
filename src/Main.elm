@@ -1125,11 +1125,9 @@ update msg model =
                     ( { model | banner = Decode.errorToString errMsg }, Cmd.batch [ fetchTasks, fetchTags ] )
 
         UrlChanged url ->
-            -- Debug.todo "not now"
             ( model, Cmd.none )
 
         UrlRequest url ->
-            -- Debug.todo "not now"
             ( model, Cmd.none )
 
         ReturnToMain ->
