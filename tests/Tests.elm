@@ -23,7 +23,7 @@ suite =
             }
 
         ( testModel, _ ) =
-            initWithoutNavKey ( 1711211815576, True ) url
+            initWithMaybeNavKey ( 1711211815576, True ) url Nothing
 
         ( modelWithEmptyQueryParams, _ ) =
             update (UrlChanged { url | query = Nothing }) testModel

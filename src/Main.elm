@@ -1,7 +1,7 @@
 port module Main exposing (..)
 
 import BitFlags exposing (BitFlagSettings)
-import Browser
+import Browser exposing (UrlRequest(..))
 import Browser.Events exposing (Visibility(..), onVisibilityChange)
 import Browser.Navigation as Nav
 import Date exposing (Date, Unit(..))
@@ -12,7 +12,7 @@ import Element.Border as Border
 import Element.Events exposing (onClick)
 import Element.Font as Font
 import Element.Input as Input exposing (OptionState(..), button)
-import FeatherIcons as Icon exposing (Icon)
+import FeatherIcons as Icon exposing (Icon, key)
 import Html exposing (Html, td, th, tr)
 import Html.Attributes exposing (style, type_, value)
 import Html.Events
@@ -31,6 +31,7 @@ import Set exposing (Set)
 import Task
 import Time exposing (utc)
 import Url exposing (Url)
+import Url.Parser exposing ((<?>))
 
 
 
@@ -88,6 +89,7 @@ port localStoreAction : ( String, Encode.Value ) -> Cmd msg
 
 type alias Model =
     { url : Url
+    , maybeKey : Maybe Nav.Key
     , tasks : List LunarTask
     , taskOwner : String
     , currentDate : Date.Date
@@ -265,12 +267,12 @@ type alias Flags =
 
 
 init : Flags -> Url -> Nav.Key -> ( Model, Cmd Msg )
-init flags url _ =
-    initWithoutNavKey flags url
+init flags url key =
+    initWithMaybeNavKey flags url (Just key)
 
 
-initWithoutNavKey : Flags -> Url -> ( Model, Cmd Msg )
-initWithoutNavKey ( currentTimeinMillis, validAuth ) url =
+initWithMaybeNavKey : Flags -> Url -> Maybe Nav.Key -> ( Model, Cmd Msg )
+initWithMaybeNavKey ( currentTimeinMillis, validAuth ) url maybeKey =
     let
         loginCmd =
             if validAuth then
@@ -300,7 +302,8 @@ initWithoutNavKey ( currentTimeinMillis, validAuth ) url =
 
         model : Model
         model =
-            { url = url
+            { maybeKey = maybeKey
+            , url = url
             , tasks = []
             , taskOwner = ""
             , currentDate = currentDate
@@ -443,6 +446,26 @@ update msg model =
             in
             ( { m | currentDate = newDate }, lc )
 
+        maybeUpdateQueryParams : ( Model, List (Cmd Msg) ) -> ( Model, List (Cmd Msg) )
+        maybeUpdateQueryParams ( m, lc ) =
+            case m.maybeKey of
+                Just key ->
+                    let
+                        oldQueryString =
+                            m.url.query
+
+                        newQueryString =
+                            generateQueryParams m
+                    in
+                    if Maybe.withDefault "" oldQueryString /= newQueryString then
+                        ( { m | banner = newQueryString }, Nav.replaceUrl key newQueryString :: lc )
+
+                    else
+                        ( m, lc )
+
+                Nothing ->
+                    ( m, lc )
+
         fetchCacheDigestIfXMinutesSinceCheck : Int -> ( Model, List (Cmd Msg) ) -> ( Model, List (Cmd Msg) )
         fetchCacheDigestIfXMinutesSinceCheck minutes ( m, lc ) =
             let
@@ -494,7 +517,9 @@ update msg model =
                     update (LoadTasks Encode.null) { model | banner = "Recv data unrecognized: " ++ unknownMessage }
 
         ToggleTag tag ->
-            ( model |> toggleTag tag, Cmd.none )
+            ( model |> toggleTag tag, [] )
+                |> maybeUpdateQueryParams
+                |> batchCmdList
 
         EditTags ->
             ( { model | view = LoadedTasks (TagSettingsView Nothing) }, Cmd.none )
@@ -580,29 +605,45 @@ update msg model =
             ( { model | tagNameInput = updatedTagName }, Cmd.none )
 
         SelectFilter filter ->
-            ( model |> selectFilter filter, Cmd.none )
+            ( model |> selectFilter filter, [] )
+                |> maybeUpdateQueryParams
+                |> batchCmdList
 
         Search term ->
-            ( model |> updateSearchTerm term, Cmd.none )
+            ( model |> updateSearchTerm term, [] )
+                |> maybeUpdateQueryParams
+                |> batchCmdList
 
         ClearSearch ->
-            ( model |> updateSearchTerm "", Cmd.none )
+            ( model |> updateSearchTerm "", [] )
+                |> maybeUpdateQueryParams
+                |> batchCmdList
 
         ClearBanner ->
             ( { model | banner = "" }, Cmd.none )
 
         FilterReset ->
-            ( model |> resetFilter, Cmd.none )
+            ( model |> resetFilter, [] )
+                |> maybeUpdateQueryParams
+                |> batchCmdList
 
         ToggleSortOrder ->
-            ( model |> toggleSortOrder, Cmd.none )
+            ( model |> toggleSortOrder, [] )
+                |> maybeUpdateQueryParams
+                |> batchCmdList
 
         SelectSort sortType ->
-            if sortType == model.sort then
-                ( toggleSortOrder model, Cmd.none )
+            let
+                updatedModel =
+                    if sortType == model.sort then
+                        toggleSortOrder model
 
-            else
-                ( model |> updateSort sortType, Cmd.none )
+                    else
+                        updateSort sortType model
+            in
+            ( updatedModel, [] )
+                |> maybeUpdateQueryParams
+                |> batchCmdList
 
         ViewChange viewType ->
             ( { model | view = viewType }, Cmd.none )
@@ -1081,14 +1122,15 @@ update msg model =
                             }
                     in
                     ( modelWithLoadedTags
-                    , Cmd.batch
-                        [ -- inform backend of current cached state
-                          updateCacheDigest <| generateCacheDigest model.tasks modelWithLoadedTags
+                    , [ -- inform backend of current cached state
+                        updateCacheDigest <| generateCacheDigest model.tasks modelWithLoadedTags
 
-                        -- update local store
-                        , localStoreAction ( "set", localStoreEncoder modelWithLoadedTags )
-                        ]
+                      -- update local store
+                      , localStoreAction ( "set", localStoreEncoder modelWithLoadedTags )
+                      ]
                     )
+                        |> maybeUpdateQueryParams
+                        |> batchCmdList
 
                 Err errMsg ->
                     ( { model
@@ -1125,9 +1167,9 @@ update msg model =
                     ( { model | banner = Decode.errorToString errMsg }, Cmd.batch [ fetchTasks, fetchTags ] )
 
         UrlChanged url ->
-            ( model, Cmd.none )
+            ( { model | url = url }, Cmd.none )
 
-        UrlRequest url ->
+        UrlRequest _ ->
             ( model, Cmd.none )
 
         ReturnToMain ->

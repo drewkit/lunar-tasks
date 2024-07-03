@@ -2,8 +2,11 @@ module ListSettings exposing (..)
 
 import BitFlags exposing (BitFlagSettings)
 import Date
+import Dict
 import LunarTask exposing (..)
 import Set exposing (Set)
+import Url.Builder as Builder
+import Url.Parser.Query as QueryParser exposing (Parser)
 
 
 type alias ListSettings r =
@@ -12,7 +15,6 @@ type alias ListSettings r =
         , sort : ListSort
         , tagsSelected : ( Set String, Set String )
         , searchTerm : Maybe String
-        , tagSettings : BitFlagSettings
     }
 
 
@@ -245,6 +247,113 @@ sortTaskList sortType currentDate tasks =
 
                 DESC ->
                     tasks |> List.reverse
+
+
+
+-- QUERY PARAMS
+
+
+sortOrderToQueryParam : SortOrder -> String
+sortOrderToQueryParam sortOrder =
+    case sortOrder of
+        ASC ->
+            "asc"
+
+        DESC ->
+            "desc"
+
+
+listSortToQueryParam : ListSort -> ( String, String )
+listSortToQueryParam listSort =
+    case listSort of
+        SortPastDueDays order ->
+            ( "days", sortOrderToQueryParam order )
+
+        SortPastDuePeriods order ->
+            ( "period", sortOrderToQueryParam order )
+
+        SortLastCompleted order ->
+            ( "lastcompleted", sortOrderToQueryParam order )
+
+        NoSort order ->
+            ( "createdat", sortOrderToQueryParam order )
+
+
+filterToQueryParam : ListFilter -> String
+filterToQueryParam listFilter =
+    case listFilter of
+        FilterPastDue ->
+            "pastdue"
+
+        FilterNonPastDue ->
+            "nonpastdue"
+
+        FilterAll ->
+            "all"
+
+        FilterPastDueByDays _ ->
+            "filterpastduebydays"
+
+        FilterPastDueByPeriods _ ->
+            "filterpastduebyperiods"
+
+
+generateQueryParams : ListSettings r -> String
+generateQueryParams listSettings =
+    let
+        ( whitelist, blacklist ) =
+            genBuilderStringsForTagsSelected listSettings.tagsSelected
+    in
+    case listSortToQueryParam listSettings.sort of
+        ( listSort, sortOrder ) ->
+            Builder.toQuery
+                [ Builder.string "sort" listSort
+                , Builder.string "order" sortOrder
+                , Builder.string "filter" (filterToQueryParam listSettings.filter)
+                , Builder.string "q" (Maybe.withDefault "" listSettings.searchTerm)
+                , Builder.string "whitelist" whitelist
+                , Builder.string "blacklist" blacklist
+                ]
+
+
+genBuilderStringsForTagsSelected : ( Set String, Set String ) -> ( String, String )
+genBuilderStringsForTagsSelected tagsSelected =
+    case tagsSelected of
+        ( whitelisttags, blacklisttags ) ->
+            ( String.join "," (Set.toList whitelisttags), String.join "," (Set.toList blacklisttags) )
+
+
+filterParser : Parser (Maybe ListFilter)
+filterParser =
+    QueryParser.enum "filter"
+        (Dict.fromList
+            [ ( "pastdue", FilterPastDue )
+            , ( "notpastdue", FilterNonPastDue )
+            , ( "filterall", FilterAll )
+            ]
+        )
+
+
+sortOrderParser : Parser (Maybe SortOrder)
+sortOrderParser =
+    QueryParser.enum "order"
+        (Dict.fromList
+            [ ( "asc", ASC )
+            , ( "desc", DESC )
+            ]
+        )
+
+
+sortTypeParser : Parser (Maybe (SortOrder -> ListSort))
+sortTypeParser =
+    QueryParser.enum "sort"
+        (Dict.fromList
+            [ ( "days", SortPastDueDays )
+            , ( "periods", SortPastDuePeriods )
+            , ( "lastcompleted", SortLastCompleted )
+            , ( "none", NoSort )
+            ]
+        )
 
 
 
