@@ -459,7 +459,7 @@ update msg model =
                             generateQueryParams m
                     in
                     if Maybe.withDefault "" oldQueryString /= newQueryString then
-                        ( { m | banner = newQueryString }, Nav.replaceUrl key newQueryString :: lc )
+                        ( { m | banner = newQueryString }, Nav.replaceUrl key ("/" ++ newQueryString) :: lc )
 
                     else
                         ( m, lc )

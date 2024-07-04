@@ -304,17 +304,24 @@ generateQueryParams listSettings =
     let
         ( whitelist, blacklist ) =
             genBuilderStringsForTagsSelected listSettings.tagsSelected
+
+        buildIfNotDefault defaultVal val builder acc =
+            if defaultVal == val then
+                acc
+
+            else
+                builder :: acc
     in
     case listSortToQueryParam listSettings.sort of
         ( listSort, sortOrder ) ->
-            Builder.toQuery
-                [ Builder.string "sort" listSort
-                , Builder.string "order" sortOrder
-                , Builder.string "filter" (filterToQueryParam listSettings.filter)
-                , Builder.string "q" (Maybe.withDefault "" listSettings.searchTerm)
-                , Builder.string "whitelist" whitelist
-                , Builder.string "blacklist" blacklist
-                ]
+            []
+                |> buildIfNotDefault (NoSort DESC) listSettings.sort (Builder.string "sort" listSort)
+                |> buildIfNotDefault (NoSort DESC) listSettings.sort (Builder.string "order" sortOrder)
+                |> buildIfNotDefault FilterAll listSettings.filter (Builder.string "filter" (filterToQueryParam listSettings.filter))
+                |> buildIfNotDefault Nothing listSettings.searchTerm (Builder.string "q" (Maybe.withDefault "" listSettings.searchTerm))
+                |> buildIfNotDefault "" whitelist (Builder.string "whitelist" whitelist)
+                |> buildIfNotDefault "" blacklist (Builder.string "blacklist" blacklist)
+                |> Builder.toQuery
 
 
 genBuilderStringsForTagsSelected : ( Set String, Set String ) -> ( String, String )
@@ -337,9 +344,9 @@ initListSettingsFromQueryParams url listSettings =
                     "sort"
                     (Dict.fromList
                         [ ( "days", SortPastDueDays )
-                        , ( "periods", SortPastDuePeriods )
+                        , ( "period", SortPastDuePeriods )
                         , ( "lastcompleted", SortLastCompleted )
-                        , ( "none", NoSort )
+                        , ( "createdat", NoSort )
                         ]
                     )
                 )
@@ -360,7 +367,7 @@ initListSettingsFromQueryParams url listSettings =
                             (Dict.fromList
                                 [ ( "pastdue", FilterPastDue )
                                 , ( "notpastdue", FilterNonPastDue )
-                                , ( "filterall", FilterAll )
+                                , ( "all", FilterAll )
                                 ]
                             )
 
