@@ -1,12 +1,13 @@
 module ListSettings exposing (..)
 
-import BitFlags exposing (BitFlagSettings)
 import Date
 import Dict
 import LunarTask exposing (..)
 import Set exposing (Set)
+import Url exposing (Url)
 import Url.Builder as Builder
-import Url.Parser.Query as QueryParser exposing (Parser)
+import Url.Parser exposing ((<?>), Parser)
+import Url.Parser.Query as QueryParser
 
 
 type alias ListSettings r =
@@ -250,7 +251,7 @@ sortTaskList sortType currentDate tasks =
 
 
 
--- QUERY PARAMS
+-- SETTING QUERY PARAMS
 
 
 sortOrderToQueryParam : SortOrder -> String
@@ -323,37 +324,90 @@ genBuilderStringsForTagsSelected tagsSelected =
             ( String.join "," (Set.toList whitelisttags), String.join "," (Set.toList blacklisttags) )
 
 
-filterParser : Parser (Maybe ListFilter)
-filterParser =
-    QueryParser.enum "filter"
-        (Dict.fromList
-            [ ( "pastdue", FilterPastDue )
-            , ( "notpastdue", FilterNonPastDue )
-            , ( "filterall", FilterAll )
-            ]
-        )
+
+-- PARSING QUERY PARAMS
 
 
-sortOrderParser : Parser (Maybe SortOrder)
-sortOrderParser =
-    QueryParser.enum "order"
-        (Dict.fromList
-            [ ( "asc", ASC )
-            , ( "desc", DESC )
-            ]
-        )
+initListSettingsFromQueryParams : Url -> ListSettings r -> ListSettings r
+initListSettingsFromQueryParams url listSettings =
+    let
+        sortParser =
+            QueryParser.map2 (\a b -> Maybe.withDefault NoSort a (Maybe.withDefault DESC b))
+                (QueryParser.enum
+                    "sort"
+                    (Dict.fromList
+                        [ ( "days", SortPastDueDays )
+                        , ( "periods", SortPastDuePeriods )
+                        , ( "lastcompleted", SortLastCompleted )
+                        , ( "none", NoSort )
+                        ]
+                    )
+                )
+                (QueryParser.enum
+                    "order"
+                    (Dict.fromList
+                        [ ( "asc", ASC )
+                        , ( "desc", DESC )
+                        ]
+                    )
+                )
 
+        filterParser =
+            Url.Parser.map (Maybe.withDefault FilterAll) <|
+                Url.Parser.top
+                    <?> QueryParser.enum
+                            "filter"
+                            (Dict.fromList
+                                [ ( "pastdue", FilterPastDue )
+                                , ( "notpastdue", FilterNonPastDue )
+                                , ( "filterall", FilterAll )
+                                ]
+                            )
 
-sortTypeParser : Parser (Maybe (SortOrder -> ListSort))
-sortTypeParser =
-    QueryParser.enum "sort"
-        (Dict.fromList
-            [ ( "days", SortPastDueDays )
-            , ( "periods", SortPastDuePeriods )
-            , ( "lastcompleted", SortLastCompleted )
-            , ( "none", NoSort )
-            ]
-        )
+        searchParser : Parser (Maybe String -> b) b
+        searchParser =
+            Url.Parser.top
+                <?> QueryParser.string "q"
+
+        selectedTagsParser : Parser (( Set String, Set String ) -> b) b
+        selectedTagsParser =
+            Url.Parser.map constructSelectedTagsFromQueryParams <|
+                Url.Parser.top
+                    <?> QueryParser.string "whitelist"
+                    <?> QueryParser.string "blacklist"
+
+        constructSelectedTagsFromQueryParams : Maybe String -> Maybe String -> ( Set String, Set String )
+        constructSelectedTagsFromQueryParams white black =
+            let
+                whitelist =
+                    String.split "," (Maybe.withDefault "" white)
+                        |> Set.fromList
+
+                blacklist =
+                    String.split "," (Maybe.withDefault "" black)
+                        |> Set.fromList
+            in
+            ( whitelist, blacklist )
+
+        sort =
+            Url.Parser.parse (Url.Parser.query sortParser) url
+
+        filter : Maybe ListFilter
+        filter =
+            Url.Parser.parse filterParser url
+
+        search =
+            Url.Parser.parse searchParser url
+
+        selectedTags =
+            Url.Parser.parse selectedTagsParser url
+    in
+    { listSettings
+        | sort = Maybe.withDefault (NoSort DESC) sort
+        , filter = Maybe.withDefault FilterAll filter
+        , searchTerm = Maybe.withDefault Nothing search
+        , tagsSelected = Maybe.withDefault ( Set.empty, Set.empty ) selectedTags
+    }
 
 
 

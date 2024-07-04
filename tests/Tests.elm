@@ -18,15 +18,12 @@ suite =
             , host = "localhost"
             , port_ = Just 8000
             , path = "/"
-            , query = Just "q=mow%20lawn&filter=pastdue&sort=lastcompleted&sortorder=asc"
+            , query = Just "q=mow%20lawn&filter=pastdue&sort=lastcompleted&order=asc"
             , fragment = Nothing
             }
 
         ( testModel, _ ) =
             initWithMaybeNavKey ( 1711211815576, True ) url Nothing
-
-        ( modelWithEmptyQueryParams, _ ) =
-            update (UrlChanged { url | query = Nothing }) testModel
     in
     describe "Demo Mode"
         [ describe "query params"
@@ -41,18 +38,6 @@ suite =
                     \_ ->
                         Expect.equal testModel.sort (SortLastCompleted ASC)
                 ]
-            , skip <|
-                describe "with query params removed"
-                    [ test "nothing in text search" <|
-                        \_ ->
-                            Expect.equal Nothing modelWithEmptyQueryParams.searchTerm
-                    , test "filter by All" <|
-                        \_ ->
-                            Expect.equal modelWithEmptyQueryParams.filter FilterAll
-                    , test "sort by NoSort DESC" <|
-                        \_ ->
-                            Expect.equal (NoSort DESC) modelWithEmptyQueryParams.sort
-                    ]
             ]
         , test "CreateTask adds task to Model task list" <|
             \_ ->

@@ -332,6 +332,7 @@ initWithMaybeNavKey ( currentTimeinMillis, validAuth ) url maybeKey =
             }
     in
     ( model
+        |> initListSettingsFromQueryParams model.url
     , Cmd.batch
         [ loginCmd
         , Time.now |> Task.perform ReceivedCurrentTime
