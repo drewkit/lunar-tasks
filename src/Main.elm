@@ -310,7 +310,7 @@ initWithMaybeNavKey ( currentTimeinMillis, validAuth ) url maybeKey =
             , currentZone = currentZone
             , filter = FilterAll
             , sort = NoSort DESC
-            , tagsSelected = ( Set.fromList [], Set.fromList [] )
+            , tagsSelected = ( Set.empty, Set.empty )
             , tagSettings = BitFlags.defaultSettings 25
             , searchTerm = Nothing
             , datePicker = newDatePicker
@@ -459,7 +459,7 @@ update msg model =
                             generateQueryParams m
                     in
                     if Maybe.withDefault "" oldQueryString /= newQueryString then
-                        ( { m | banner = newQueryString }, Nav.replaceUrl key ("/" ++ newQueryString) :: lc )
+                        ( m, Nav.replaceUrl key ("/" ++ newQueryString) :: lc )
 
                     else
                         ( m, lc )
@@ -1893,11 +1893,8 @@ viewTaskDiscovery model =
 viewMain : Model -> Element Msg
 viewMain model =
     let
-        whitelistedTags =
-            Tuple.first model.tagsSelected
-
-        blacklistedTags =
-            Tuple.second model.tagsSelected
+        ( whitelistedTags, blacklistedTags ) =
+            model.tagsSelected
 
         tasks =
             model.tasks

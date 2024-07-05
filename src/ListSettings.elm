@@ -49,7 +49,7 @@ resetFilter listSettings =
     { listSettings
         | filter = FilterAll
         , sort = NoSort DESC
-        , tagsSelected = ( Set.fromList [], Set.fromList [] )
+        , tagsSelected = ( Set.empty, Set.empty )
         , searchTerm = Nothing
     }
 
@@ -303,7 +303,10 @@ generateQueryParams : ListSettings r -> String
 generateQueryParams listSettings =
     let
         ( whitelist, blacklist ) =
-            genBuilderStringsForTagsSelected listSettings.tagsSelected
+            listSettings.tagsSelected
+
+        ( whitelistStr, blacklistStr ) =
+            ( String.join "," (Set.toList whitelist), String.join "," (Set.toList blacklist) )
 
         buildIfNotDefault defaultVal val builder acc =
             if defaultVal == val then
@@ -319,16 +322,9 @@ generateQueryParams listSettings =
                 |> buildIfNotDefault (NoSort DESC) listSettings.sort (Builder.string "order" sortOrder)
                 |> buildIfNotDefault FilterAll listSettings.filter (Builder.string "filter" (filterToQueryParam listSettings.filter))
                 |> buildIfNotDefault Nothing listSettings.searchTerm (Builder.string "q" (Maybe.withDefault "" listSettings.searchTerm))
-                |> buildIfNotDefault "" whitelist (Builder.string "whitelist" whitelist)
-                |> buildIfNotDefault "" blacklist (Builder.string "blacklist" blacklist)
+                |> buildIfNotDefault Set.empty whitelist (Builder.string "whitelist" whitelistStr)
+                |> buildIfNotDefault Set.empty blacklist (Builder.string "blacklist" blacklistStr)
                 |> Builder.toQuery
-
-
-genBuilderStringsForTagsSelected : ( Set String, Set String ) -> ( String, String )
-genBuilderStringsForTagsSelected tagsSelected =
-    case tagsSelected of
-        ( whitelisttags, blacklisttags ) ->
-            ( String.join "," (Set.toList whitelisttags), String.join "," (Set.toList blacklisttags) )
 
 
 
@@ -384,17 +380,21 @@ initListSettingsFromQueryParams url listSettings =
                     <?> QueryParser.string "blacklist"
 
         constructSelectedTagsFromQueryParams : Maybe String -> Maybe String -> ( Set String, Set String )
-        constructSelectedTagsFromQueryParams white black =
+        constructSelectedTagsFromQueryParams maybeWhite maybeBlack =
             let
-                whitelist =
-                    String.split "," (Maybe.withDefault "" white)
-                        |> Set.fromList
-
-                blacklist =
-                    String.split "," (Maybe.withDefault "" black)
+                processPresentParam param =
+                    String.split "," (Maybe.withDefault "" param)
                         |> Set.fromList
             in
-            ( whitelist, blacklist )
+            case (isPresent maybeWhite, isPresent maybeBlack) of
+                (True, True ) ->
+                    (processPresentParam maybeWhite, processPresentParam maybeBlack)
+                (True, False) ->
+                    (processPresentParam maybeWhite, Set.empty)
+                (False, True) ->
+                    (Set.empty, processPresentParam maybeBlack)
+                (False, False) ->
+                    (Set.empty, Set.empty)
 
         sort =
             Url.Parser.parse (Url.Parser.query sortParser) url
@@ -485,3 +485,12 @@ flipOrder listSort =
 
         NoSort order ->
             NoSort (flip order)
+
+isPresent : Maybe a -> Bool
+isPresent item =
+    case item of
+        Nothing ->
+            False
+
+        Just _ ->
+            True
