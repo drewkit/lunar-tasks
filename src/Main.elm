@@ -2029,7 +2029,7 @@ viewTaskTable currentDate tasks =
                             [ Html.div
                                 [ Html.Attributes.class "selective-icon-opts"
                                 , Html.Attributes.class "selective-icon-opts-checkbox"
-                                , Html.Attributes.title "Mark Task Completed"
+                                , Html.Attributes.title "Delete Task"
                                 ]
                                 [ Html.div [ Html.Attributes.class "selective-icon-activated" ] [ Icon.trash2 |> Icon.toHtml [] ]
                                 , Html.div [ Html.Attributes.class "selective-icon-inactivated" ] [ Icon.trash |> Icon.toHtml [] ]
