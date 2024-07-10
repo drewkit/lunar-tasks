@@ -1270,9 +1270,10 @@ viewDemoModeBanner demo =
     if demo then
         row
             [ width fill
+            , padding 10
             , Element.htmlAttribute (Html.Attributes.style "position" "fixed")
             , Element.htmlAttribute (Html.Attributes.style "z-index" "10")
-            , Element.htmlAttribute (Html.Attributes.style "background" "rgba(0,0,0,0.5)")
+            , Element.htmlAttribute (Html.Attributes.style "background" "rgba(0,0,0,0.3)")
             ]
             [ el [ Font.center, Font.color color.white, width fill, Font.semiBold, paddingXY 0 5 ] <| text "DEMO MODE" ]
 
