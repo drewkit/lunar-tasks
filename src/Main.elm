@@ -1270,7 +1270,9 @@ viewDemoModeBanner demo =
     if demo then
         row
             [ width fill
-            , Background.color color.green
+            , Element.htmlAttribute (Html.Attributes.style "position" "fixed")
+            , Element.htmlAttribute (Html.Attributes.style "z-index" "10")
+            , Element.htmlAttribute (Html.Attributes.style "background" "rgba(0,0,0,0.5)")
             ]
             [ el [ Font.center, Font.color color.white, width fill, Font.semiBold, paddingXY 0 5 ] <| text "DEMO MODE" ]
 
@@ -1283,7 +1285,6 @@ viewLayout model innerContent =
     layout
         [ width fill
         , height fill
-        , inFront (viewDemoModeBanner <| isPresent model.demo)
         , Font.family
             [ Font.typeface "Times New Roman"
             , Font.serif
@@ -1291,7 +1292,8 @@ viewLayout model innerContent =
         ]
     <|
         column [ width fill ]
-            [ viewHeader model
+            [ viewDemoModeBanner (isPresent model.demo)
+            , viewHeader model
             , innerContent
             ]
 
@@ -1357,7 +1359,9 @@ view model =
                 LoadedTasks (TagSettingsView maybeSelectedTag) ->
                     viewTagSettings maybeSelectedTag model
     in
-    { title = "LunarTasks", body = [ viewLayout model innerContent ] }
+    { title = "LunarTasks"
+    , body = [ viewLayout model innerContent ]
+    }
 
 
 viewTagSettings : Maybe String -> Model -> Element Msg
