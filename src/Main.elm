@@ -1270,7 +1270,7 @@ viewDemoModeBanner demo =
     if demo then
         row
             [ width fill
-            , padding 10
+            , padding 3
             , Element.htmlAttribute (Html.Attributes.style "position" "fixed")
             , Element.htmlAttribute (Html.Attributes.style "z-index" "10")
             , Element.htmlAttribute (Html.Attributes.style "background" "rgba(0,0,0,0.3)")
