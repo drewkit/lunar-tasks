@@ -2,6 +2,7 @@ port module Main exposing (..)
 
 import BitFlags exposing (BitFlagSettings)
 import Browser exposing (UrlRequest(..))
+import Browser.Dom as Dom
 import Browser.Events exposing (Visibility(..), onVisibilityChange)
 import Browser.Navigation as Nav
 import Date exposing (Date, Unit(..))
@@ -400,6 +401,7 @@ type Msg
     | ReturnToMain
     | UrlRequest Browser.UrlRequest
     | UrlChanged Url
+    | NoOp
 
 
 update : Msg -> Model -> ( Model, Cmd Msg )
@@ -616,7 +618,7 @@ update msg model =
                 |> batchCmdList
 
         ClearSearch ->
-            ( model |> updateSearchTerm "", [] )
+            ( model |> updateSearchTerm "", [ Task.attempt (\_ -> NoOp) (Dom.focus "search-term") ] )
                 |> maybeUpdateQueryParams
                 |> batchCmdList
 
@@ -1186,6 +1188,9 @@ update msg model =
 
                 LoadedTasks _ ->
                     ( { model | view = LoadedTasks LoadedTasksView }, Cmd.none )
+
+        NoOp ->
+            ( model, Cmd.none )
 
 
 
@@ -1804,7 +1809,10 @@ viewTaskDiscovery model =
                 }
 
         searchTermInput =
-            Input.text [ Border.width 0 ]
+            Input.text
+                [ Border.width 0
+                , Element.htmlAttribute <| Html.Attributes.id "search-term"
+                ]
                 { text = Maybe.withDefault "" model.searchTerm
                 , onChange = Search
                 , placeholder = Just <| Input.placeholder [] <| (Icon.search |> Icon.toHtml [] |> Element.html)
