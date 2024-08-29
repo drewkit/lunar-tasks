@@ -145,10 +145,10 @@ hasTerm : String -> LunarTask -> Bool
 hasTerm rawTerm task =
     let
         term =
-            rawTerm |> String.trim
+            rawTerm |> String.trim |> String.toLower
 
         taskTitle =
-            task.title |> String.trim
+            task.title |> String.trim |> String.toLower
     in
     String.contains term taskTitle
 
@@ -386,15 +386,18 @@ initListSettingsFromQueryParams url listSettings =
                     String.split "," (Maybe.withDefault "" param)
                         |> Set.fromList
             in
-            case (isPresent maybeWhite, isPresent maybeBlack) of
-                (True, True ) ->
-                    (processPresentParam maybeWhite, processPresentParam maybeBlack)
-                (True, False) ->
-                    (processPresentParam maybeWhite, Set.empty)
-                (False, True) ->
-                    (Set.empty, processPresentParam maybeBlack)
-                (False, False) ->
-                    (Set.empty, Set.empty)
+            case ( isPresent maybeWhite, isPresent maybeBlack ) of
+                ( True, True ) ->
+                    ( processPresentParam maybeWhite, processPresentParam maybeBlack )
+
+                ( True, False ) ->
+                    ( processPresentParam maybeWhite, Set.empty )
+
+                ( False, True ) ->
+                    ( Set.empty, processPresentParam maybeBlack )
+
+                ( False, False ) ->
+                    ( Set.empty, Set.empty )
 
         sort =
             Url.Parser.parse (Url.Parser.query sortParser) url
@@ -485,6 +488,7 @@ flipOrder listSort =
 
         NoSort order ->
             NoSort (flip order)
+
 
 isPresent : Maybe a -> Bool
 isPresent item =
