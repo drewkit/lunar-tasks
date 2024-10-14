@@ -2001,6 +2001,18 @@ viewTaskTable currentDate tasks =
 
                             else
                                 td [] []
+
+                        lastCompletedTd =
+                            if pastDueTask then
+                                td []
+                                    [ Html.text <| Date.toIsoString (getLastCompletedAt task) ]
+
+                            else
+                                td
+                                    [ Html.Attributes.title
+                                        ("This task will be past due again on " ++ Date.toIsoString (getNextPastDueDate task))
+                                    ]
+                                    [ Html.text <| Date.toIsoString (getLastCompletedAt task) ]
                     in
                     tr []
                         [ td
@@ -2013,8 +2025,7 @@ viewTaskTable currentDate tasks =
                         , pastDueTd
                         , td []
                             [ Html.text <| String.fromInt task.period ]
-                        , td []
-                            [ Html.text <| Date.toIsoString (getLastCompletedAt task) ]
+                        , lastCompletedTd
                         , td
                             [ Html.Attributes.style "cursor" "pointer"
                             , Html.Attributes.style "text-align" "center"

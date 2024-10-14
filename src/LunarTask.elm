@@ -5,6 +5,7 @@ module LunarTask exposing
     , genTaskWithOptions
     , getDaysPastDue
     , getLastCompletedAt
+    , getNextPastDueDate
     , insertOrUpdateTask
     , lunarTaskDecoder
     , lunarTaskEncoder
@@ -18,7 +19,7 @@ module LunarTask exposing
     , removeCompletionEntry
     )
 
-import Date exposing (Unit(..))
+import Date exposing (Interval(..), Unit(..))
 import Json.Decode exposing (Decoder, field, int, map2, map7, string)
 import Json.Encode as Encode
 
@@ -57,6 +58,15 @@ markTaskCompleted task maybeEntryDate =
 
         Nothing ->
             task
+
+
+getNextPastDueDate : LunarTask -> Date.Date
+getNextPastDueDate task =
+    let
+        lastCompletionDate =
+            getLastCompletedAt task
+    in
+    Date.add Date.Days task.period lastCompletionDate
 
 
 getLastCompletedAt : LunarTask -> Date.Date
