@@ -4,6 +4,7 @@ module LunarTask exposing
     , findTaskById
     , genTaskWithOptions
     , getDaysPastDue
+    , getHistoricalCadence
     , getLastCompletedAt
     , getNextPastDueDate
     , insertOrUpdateTask
@@ -58,6 +59,11 @@ markTaskCompleted task maybeEntryDate =
 
         Nothing ->
             task
+
+
+getHistoricalCadence : LunarTask -> Maybe Float
+getHistoricalCadence task =
+    Just 45.6
 
 
 getNextPastDueDate : LunarTask -> Date.Date
@@ -234,7 +240,7 @@ entryInfoToDate info =
 -- Mocked Data
 
 
-genTaskWithOptions : { lastCompletion : Date.Date, period : Int } -> LunarTask
+genTaskWithOptions : { entries : List Date.Date, period : Int } -> LunarTask
 genTaskWithOptions opts =
     { taskOwner = "1234567"
     , title = "task"
@@ -242,7 +248,7 @@ genTaskWithOptions opts =
     , notes = ""
     , id = "1234567788"
     , period = opts.period
-    , completionEntries = [ opts.lastCompletion ]
+    , completionEntries = opts.entries
     }
 
 

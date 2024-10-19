@@ -3,7 +3,7 @@ module Tests exposing (..)
 import Date
 import Expect
 import ListSettings exposing (..)
-import LunarTask exposing (getLastCompletedAt, markTaskCompleted, pastDue)
+import LunarTask exposing (genTaskWithOptions, getHistoricalCadence, getLastCompletedAt, markTaskCompleted, pastDue)
 import Main exposing (..)
 import Test exposing (..)
 import Time
@@ -13,6 +13,22 @@ import Url
 suite : Test
 suite =
     let
+        dayInMillis =
+            86400000.0
+
+        genEntries : Int -> Float -> Int -> List Date.Date
+        genEntries start period count =
+            let
+                periodInMillis : Float
+                periodInMillis =
+                    period * dayInMillis
+            in
+            List.range 0 (count - 1)
+                |> List.map toFloat
+                |> List.map (\n -> toFloat start + (periodInMillis * n))
+                |> List.map (\n -> Time.millisToPosix <| ceiling n)
+                |> List.map (\n -> Date.fromPosix Time.utc n)
+
         url =
             { protocol = Url.Http
             , host = "localhost"
@@ -25,7 +41,7 @@ suite =
         ( testModel, _ ) =
             initWithMaybeNavKey ( 1711211815576, True ) url Nothing
     in
-    describe "Demo Mode"
+    describe "Lunar Tasks"
         [ describe "query params"
             [ describe "on initialization with loaded query params"
                 [ test "'mow lawn' in text search" <|
@@ -83,7 +99,7 @@ suite =
                     taskThatIsPastDueInOneDay =
                         LunarTask.genTaskWithOptions
                             { period = 1
-                            , lastCompletion = Date.fromPosix Time.utc prevTime
+                            , entries = [ Date.fromPosix Time.utc prevTime ]
                             }
 
                     ( dayLaterModel, _ ) =
@@ -94,4 +110,27 @@ suite =
                     , \task -> Expect.equal (pastDue dayLaterModel.currentDate task) True
                     ]
                     taskThatIsPastDueInOneDay
+        , describe "historical cadence of completed entries"
+            [ test "no reporting under five entries" <|
+                \_ ->
+                    let
+                        taskUnderFive =
+                            genTaskWithOptions { period = 10, entries = genEntries 1711211815576 12.8 4 }
+                    in
+                    Expect.equal (getHistoricalCadence taskUnderFive) Nothing
+            , test "reporting at five entries" <|
+                \_ ->
+                    let
+                        taskAtFive =
+                            genTaskWithOptions { period = 10, entries = genEntries 1711211815576 12.8 5 }
+                    in
+                    Expect.equal (getHistoricalCadence taskAtFive) (Just 12.8)
+            , test "reporting over five entries" <|
+                \_ ->
+                    let
+                        taskOverFive =
+                            genTaskWithOptions { period = 10, entries = genEntries 1711211815576 12.8 9 }
+                    in
+                    Expect.equal (getHistoricalCadence taskOverFive) (Just 12.8)
+            ]
         ]
