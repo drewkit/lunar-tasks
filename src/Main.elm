@@ -1567,6 +1567,15 @@ viewTask model =
             el [] (text "no task found")
 
         Just task ->
+            let
+                historicalCadenceMsg =
+                    case getHistoricalCadence task of
+                        Nothing ->
+                            ""
+
+                        Just historicalCadence ->
+                            "This task is completed on average once every " ++ String.fromInt historicalCadence ++ " days"
+            in
             Element.column [ paddingXY 100 45, spacingXY 0 25 ]
                 [ Input.text []
                     { label = Input.labelAbove [ Font.semiBold ] (text "Title")
@@ -1616,6 +1625,7 @@ viewTask model =
                     ]
                 , column []
                     [ el [ Font.bold ] (text "Completion Entries")
+                    , el [] (text historicalCadenceMsg)
                     , el [ Border.width 1, paddingXY 10 10, Border.color color.lightGrey ] <|
                         (DatePicker.view Nothing
                             datePickerSettings

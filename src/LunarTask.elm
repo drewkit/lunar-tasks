@@ -23,6 +23,7 @@ module LunarTask exposing
 import Date exposing (Interval(..), Unit(..))
 import Json.Decode exposing (Decoder, field, int, map2, map7, string)
 import Json.Encode as Encode
+import List exposing (length)
 
 
 type alias LunarTask =
@@ -61,9 +62,33 @@ markTaskCompleted task maybeEntryDate =
             task
 
 
-getHistoricalCadence : LunarTask -> Maybe Float
+getHistoricalCadence : LunarTask -> Maybe Int
 getHistoricalCadence task =
-    Just 45.6
+    let
+        completionEntryCount =
+            List.length task.completionEntries
+    in
+    if completionEntryCount < 5 then
+        Nothing
+
+    else
+        let
+            completionEntries =
+                List.reverse task.completionEntries
+
+            previousDates =
+                List.take (completionEntryCount - 1) completionEntries
+
+            nextDates =
+                List.drop 1 completionEntries
+
+            recordedCadences =
+                List.map2 (\p n -> Date.diff Date.Days p n) previousDates nextDates
+
+            recordedCadenceCount =
+                List.length recordedCadences
+        in
+        Just <| List.sum recordedCadences // recordedCadenceCount
 
 
 getNextPastDueDate : LunarTask -> Date.Date

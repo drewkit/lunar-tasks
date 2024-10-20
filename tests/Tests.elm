@@ -3,7 +3,7 @@ module Tests exposing (..)
 import Date
 import Expect
 import ListSettings exposing (..)
-import LunarTask exposing (genTaskWithOptions, getHistoricalCadence, getLastCompletedAt, markTaskCompleted, pastDue)
+import LunarTask exposing (LunarTask, genTaskWithOptions, getHistoricalCadence, getLastCompletedAt, markTaskCompleted, pastDue)
 import Main exposing (..)
 import Test exposing (..)
 import Time
@@ -26,7 +26,7 @@ suite =
             List.range 0 (count - 1)
                 |> List.map toFloat
                 |> List.map (\n -> toFloat start + (periodInMillis * n))
-                |> List.map (\n -> Time.millisToPosix <| ceiling n)
+                |> List.map (\n -> Time.millisToPosix <| round n)
                 |> List.map (\n -> Date.fromPosix Time.utc n)
 
         url =
@@ -114,23 +114,28 @@ suite =
             [ test "no reporting under five entries" <|
                 \_ ->
                     let
-                        taskUnderFive =
-                            genTaskWithOptions { period = 10, entries = genEntries 1711211815576 12.8 4 }
+                        task =
+                            genTaskWithOptions { period = 10, entries = [] }
+
+                        fourEntries =
+                            genEntries 1711211815576 12.2 4
+
+                        taskUnderFiveCompletionEntries =
+                            List.foldl (\entry t -> markTaskCompleted t (Just entry)) task fourEntries
                     in
-                    Expect.equal (getHistoricalCadence taskUnderFive) Nothing
-            , test "reporting at five entries" <|
-                \_ ->
-                    let
-                        taskAtFive =
-                            genTaskWithOptions { period = 10, entries = genEntries 1711211815576 12.8 5 }
-                    in
-                    Expect.equal (getHistoricalCadence taskAtFive) (Just 12.8)
+                    Expect.equal (getHistoricalCadence taskUnderFiveCompletionEntries) Nothing
             , test "reporting over five entries" <|
                 \_ ->
                     let
-                        taskOverFive =
-                            genTaskWithOptions { period = 10, entries = genEntries 1711211815576 12.8 9 }
+                        task =
+                            genTaskWithOptions { period = 10, entries = [] }
+
+                        overFiveEntries =
+                            genEntries 1711211815576 15 12
+
+                        taskOverFiveCompletionEntries =
+                            List.foldl (\entry t -> markTaskCompleted t (Just entry)) task overFiveEntries
                     in
-                    Expect.equal (getHistoricalCadence taskOverFive) (Just 12.8)
+                    Expect.equal (getHistoricalCadence taskOverFiveCompletionEntries) (Just 15)
             ]
         ]
