@@ -1,0 +1,23 @@
+{
+  "$schema": "https://raw.githubusercontent.com/jetify-com/devbox/0.13.6/.schema/devbox.schema.json",
+  "packages": [
+    "elmPackages.elm@latest",
+    "elmPackages.elm-doc-preview@latest",
+    "elmPackages.elm-format@latest",
+    "elmPackages.elm-test@latest",
+    "elmPackages.elm-live@latest"
+  ],
+  "shell": {
+    "init_hook": [
+      "echo 'Welcome to devbox!' > /dev/null"
+    ],
+    "scripts": {
+      "test": [
+        "elm-test ."
+      ],
+      "dev-server": [
+        "elm-live src/Main.elm --open --dir=public -- --output=public/js/main.js --debug"
+      ]
+    }
+  }
+}
