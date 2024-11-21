@@ -15,8 +15,8 @@ import Element.Font as Font
 import Element.Input as Input exposing (OptionState(..), button)
 import FeatherIcons as Icon exposing (Icon, key)
 import Html exposing (Html, td, th, tr)
-import Html.Attributes exposing (style, type_, value)
-import Html.Events
+import Html.Attributes exposing (hidden, style, type_, value)
+import Html.Events exposing (onBlur)
 import Http
 import Json.Decode as Decode exposing (Decoder, errorToString)
 import Json.Encode as Encode
@@ -24,6 +24,7 @@ import Keyboard exposing (Key(..))
 import List
 import ListSettings exposing (..)
 import LunarTask exposing (..)
+import Markdown.Renderer.ElmUi as Markdown
 import NewLunarTask exposing (..)
 import Process
 import SHA1
@@ -119,18 +120,22 @@ type alias Model =
     }
 
 
+type alias EditingNotes =
+    Bool
+
+
 type LoadedTasksViewState
     = JsonExportView
-    | LoadedTasksView
-    | EditTaskView
+    | MainTasksView
+    | EditTaskView EditingNotes
     | TagSettingsView (Maybe String)
 
 
 type ViewState
-    = LoginPrompt
+    = LoginPromptView
     | LoadingTasksView
     | LoadingTasksFailureView
-    | LoadedTasks LoadedTasksViewState
+    | LoadedTasksView LoadedTasksViewState
 
 
 
@@ -235,7 +240,7 @@ resetLogin attrs =
         | tasks = []
         , demo = Nothing
         , taskOwner = ""
-        , view = LoginPrompt
+        , view = LoginPromptView
         , tagSettings = BitFlags.defaultSettings 25
         , banner = ""
         , tagResourcesLoaded = False
@@ -287,7 +292,7 @@ initWithMaybeNavKey ( currentTimeinMillis, validAuth ) url maybeKey =
                 LoadingTasksView
 
             else
-                LoginPrompt
+                LoginPromptView
 
         currentZone =
             utc
@@ -363,6 +368,7 @@ type Msg
     | FilterReset
     | LocalStoreFetched Decode.Value
     | ToggleSortOrder
+    | ToggleNoteEdit
     | SelectFilter ListFilter
     | SelectSort ListSort
     | ViewChange ViewState
@@ -524,16 +530,19 @@ update msg model =
                 |> maybeUpdateQueryParams
                 |> batchCmdList
 
+        ToggleNoteEdit ->
+            ( { model | view = toggleNoteEdit model.view }, Task.attempt (\_ -> NoOp) (Dom.focus "notes-input") )
+
         EditTags ->
-            ( { model | view = LoadedTasks (TagSettingsView Nothing) }, Cmd.none )
+            ( { model | view = LoadedTasksView (TagSettingsView Nothing) }, Cmd.none )
 
         SelectTagToEdit maybeTagName ->
             case maybeTagName of
                 Just tagName ->
-                    ( { model | view = LoadedTasks (TagSettingsView (Just tagName)), tagNameInput = tagName }, Cmd.none )
+                    ( { model | view = LoadedTasksView (TagSettingsView (Just tagName)), tagNameInput = tagName }, Cmd.none )
 
                 Nothing ->
-                    ( { model | view = LoadedTasks (TagSettingsView Nothing), tagNameInput = "" }, Cmd.none )
+                    ( { model | view = LoadedTasksView (TagSettingsView Nothing), tagNameInput = "" }, Cmd.none )
 
         CompareCacheDigest jsonUser ->
             let
@@ -588,7 +597,7 @@ update msg model =
                     BitFlags.updateFlag oldName model.tagNameInput model.tagSettings
             in
             if isPresent model.demo then
-                ( { model | tagSettings = updatedTagSettings, view = LoadedTasks (TagSettingsView Nothing) }, Cmd.none )
+                ( { model | tagSettings = updatedTagSettings, view = LoadedTasksView (TagSettingsView Nothing) }, Cmd.none )
 
             else
                 ( model, updateTags (Encode.list Encode.string (BitFlags.serialize updatedTagSettings)) )
@@ -599,7 +608,7 @@ update msg model =
                     BitFlags.deleteFlag tagName model.tagSettings
             in
             if isPresent model.demo then
-                ( { model | tagSettings = updatedTagSettings, view = LoadedTasks (TagSettingsView Nothing) }, Cmd.none )
+                ( { model | tagSettings = updatedTagSettings, view = LoadedTasksView (TagSettingsView Nothing) }, Cmd.none )
 
             else
                 ( model, updateTags (Encode.list Encode.string (BitFlags.serialize updatedTagSettings)) )
@@ -670,10 +679,10 @@ update msg model =
                     ( model, Cmd.none )
 
                 Just task ->
-                    ( { model | view = LoadedTasks EditTaskView, editedTask = Just task }, Cmd.none )
+                    ( { model | view = LoadedTasksView (EditTaskView False), editedTask = Just task }, Cmd.none )
 
         EditTaskCancel ->
-            ( { model | editedTask = Nothing, view = LoadedTasks LoadedTasksView }, Cmd.none )
+            ( { model | editedTask = Nothing, view = LoadedTasksView MainTasksView }, Cmd.none )
 
         EditTaskSave ->
             case model.editedTask of
@@ -701,19 +710,19 @@ update msg model =
                             update (TaskUpdated (lunarTaskEncoder editedTask))
                                 { model
                                     | editedTask = Nothing
-                                    , view = LoadedTasks LoadedTasksView
+                                    , view = LoadedTasksView MainTasksView
                                 }
 
                         else
                             ( { model
                                 | editedTask = Nothing
-                                , view = LoadedTasks LoadedTasksView
+                                , view = LoadedTasksView MainTasksView
                               }
                             , updateTask (lunarTaskEncoder editedTask)
                             )
 
                     else
-                        ( { model | editedTask = Nothing, view = LoadedTasks LoadedTasksView }, Cmd.none )
+                        ( { model | editedTask = Nothing, view = LoadedTasksView MainTasksView }, Cmd.none )
 
         EditTaskRemoveCompletionEntry entryDate ->
             case model.editedTask of
@@ -1024,7 +1033,7 @@ update msg model =
                     case Decode.decodeString (Decode.list lunarTaskDecoder) demoDataString of
                         Ok tasks ->
                             ( { model
-                                | view = LoadedTasks LoadedTasksView
+                                | view = LoadedTasksView MainTasksView
                                 , tasks = tasks
                               }
                             , Cmd.none
@@ -1077,7 +1086,7 @@ update msg model =
                         loadedTasksModel =
                             { model
                                 | tasks = tasks
-                                , view = LoadedTasks LoadedTasksView
+                                , view = LoadedTasksView MainTasksView
                             }
                     in
                     ( loadedTasksModel
@@ -1155,7 +1164,7 @@ update msg model =
                 Ok localStore ->
                     if model.taskOwner == localStore.taskOwner then
                         ( { model
-                            | view = LoadedTasks LoadedTasksView
+                            | view = LoadedTasksView MainTasksView
                             , tasks = localStore.tasks
                             , tagSettings = localStore.bitFlags
                             , tagResourcesLoaded = True
@@ -1177,7 +1186,7 @@ update msg model =
 
         ReturnToMain ->
             case model.view of
-                LoginPrompt ->
+                LoginPromptView ->
                     ( model, Cmd.none )
 
                 LoadingTasksView ->
@@ -1186,8 +1195,8 @@ update msg model =
                 LoadingTasksFailureView ->
                     ( model, Cmd.none )
 
-                LoadedTasks _ ->
-                    ( { model | view = LoadedTasks LoadedTasksView }, Cmd.none )
+                LoadedTasksView _ ->
+                    ( { model | view = LoadedTasksView MainTasksView }, Cmd.none )
 
         NoOp ->
             ( model, Cmd.none )
@@ -1250,11 +1259,11 @@ loginlogoutButton viewType =
 
         exportButton =
             case viewType of
-                LoadedTasks LoadedTasksView ->
-                    button buttonAttrs { label = text "JSON export", onPress = Just (ViewChange (LoadedTasks JsonExportView)) }
+                LoadedTasksView MainTasksView ->
+                    button buttonAttrs { label = text "JSON export", onPress = Just (ViewChange (LoadedTasksView JsonExportView)) }
 
                 _ ->
-                    button buttonAttrs { label = text "Return to Main", onPress = Just (ViewChange (LoadedTasks LoadedTasksView)) }
+                    button buttonAttrs { label = text "Return to Main", onPress = Just (ViewChange (LoadedTasksView MainTasksView)) }
 
         logoutButton =
             row rowSpecs
@@ -1263,7 +1272,7 @@ loginlogoutButton viewType =
                 ]
     in
     case viewType of
-        LoginPrompt ->
+        LoginPromptView ->
             loginButton
 
         _ ->
@@ -1344,7 +1353,7 @@ view model =
     let
         innerContent =
             case model.view of
-                LoginPrompt ->
+                LoginPromptView ->
                     viewLandingPage
 
                 LoadingTasksView ->
@@ -1353,21 +1362,37 @@ view model =
                 LoadingTasksFailureView ->
                     el [] (text "")
 
-                LoadedTasks LoadedTasksView ->
+                LoadedTasksView MainTasksView ->
                     viewMain model
 
-                LoadedTasks EditTaskView ->
-                    viewTask model
+                LoadedTasksView (EditTaskView editingNotes) ->
+                    viewTask model editingNotes
 
-                LoadedTasks JsonExportView ->
+                LoadedTasksView JsonExportView ->
                     viewTasksJson model
 
-                LoadedTasks (TagSettingsView maybeSelectedTag) ->
+                LoadedTasksView (TagSettingsView maybeSelectedTag) ->
                     viewTagSettings maybeSelectedTag model
     in
     { title = "LunarTasks"
     , body = [ viewLayout model innerContent ]
     }
+
+
+toggleNoteEdit : ViewState -> ViewState
+toggleNoteEdit viewState =
+    case viewState of
+        LoadedTasksView loadedTasksViewState ->
+            case loadedTasksViewState of
+                EditTaskView editingNotes ->
+                    LoadedTasksView <|
+                        EditTaskView (toggle editingNotes)
+
+                _ ->
+                    viewState
+
+        _ ->
+            viewState
 
 
 viewTagSettings : Maybe String -> Model -> Element Msg
@@ -1536,9 +1561,46 @@ viewTasksJson model =
     Element.html <| Html.pre [] [ Html.text (Encode.encode 2 encodedList) ]
 
 
-viewTask : Model -> Element Msg
-viewTask model =
+viewTask : Model -> Bool -> Element Msg
+viewTask model editingNotes =
     let
+        notesField notes =
+            let
+                editableField =
+                    Input.multiline
+                        [ Element.Events.onLoseFocus ToggleNoteEdit
+                        , htmlAttribute (Html.Attributes.id "notes-input")
+                        , Element.alignLeft
+                        , Element.alignTop
+                        , Element.paddingEach { top = 0, bottom = 160, left = 0, right = 0 }
+                        ]
+                        { label = Input.labelHidden "notes"
+                        , onChange = EditTaskNotes
+                        , text = notes
+                        , spellcheck = True
+                        , placeholder = Nothing
+                        }
+
+                renderedField =
+                    Markdown.default notes
+                        |> Result.map
+                            (Element.column
+                                [ onClick ToggleNoteEdit
+                                , Element.width Element.fill
+                                , Border.width 1
+                                , Element.alignLeft
+                                , Element.alignTop
+                                , Element.paddingEach { top = 5, bottom = 160, left = 10, right = 10 }
+                                ]
+                            )
+                        |> Result.withDefault (el [] <| text "Error rendering markdown")
+            in
+            if editingNotes then
+                editableField
+
+            else
+                renderedField
+
         buttonAttrs =
             [ Font.semiBold
             , Font.size 15
@@ -1593,13 +1655,8 @@ viewTask model =
                     , text = String.fromInt task.period
                     , placeholder = Nothing
                     }
-                , Input.multiline []
-                    { label = Input.labelAbove [ Font.semiBold ] (text "Notes")
-                    , onChange = EditTaskNotes
-                    , text = task.notes
-                    , spellcheck = True
-                    , placeholder = Nothing
-                    }
+                , el [ Font.bold ] (text "Notes")
+                , notesField task.notes
                 , column []
                     [ el [ Font.bold ] (text "Tags")
                     , SearchBox.input []
@@ -2226,3 +2283,8 @@ isPresent item =
 
         Just _ ->
             True
+
+
+toggle : Bool -> Bool
+toggle a =
+    not a
