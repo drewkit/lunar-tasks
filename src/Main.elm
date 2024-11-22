@@ -700,6 +700,7 @@ update msg model =
                             , id = "asdfasdf"
                             , bitTags = 0
                             , taskOwner = "alksdjflasd"
+                            , allYearOrSeasonal = AllYear
                             }
 
                         originalTask =

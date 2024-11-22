@@ -1,5 +1,6 @@
 module LunarTask exposing
-    ( LunarTask
+    ( AllYearOrSeasonal(..)
+    , LunarTask
     , deleteTaskFromList
     , findTaskById
     , genTaskWithOptions
@@ -20,10 +21,26 @@ module LunarTask exposing
     , removeCompletionEntry
     )
 
-import Date exposing (Interval(..), Unit(..))
-import Json.Decode exposing (Decoder, field, int, map2, map7, string)
+import Date exposing (Date, Interval(..), Unit(..))
+import Json.Decode as Decode exposing (Decoder, field, int, map2, map7, map8, string)
 import Json.Encode as Encode
 import List exposing (length)
+
+
+type alias SeasonStart =
+    Int
+
+
+type alias SeasonEnd =
+    Int
+
+
+type AllYearOrSeasonal
+    = AllYear
+
+
+
+-- | Seasonal SeasonStart SeasonEnd
 
 
 type alias LunarTask =
@@ -34,6 +51,7 @@ type alias LunarTask =
     , period : Int
     , bitTags : Int
     , completionEntries : List Date.Date
+    , allYearOrSeasonal : AllYearOrSeasonal
     }
 
 
@@ -226,21 +244,22 @@ lunarTaskEncoder task =
 
 lunarTaskDecoder : Decoder LunarTask
 lunarTaskDecoder =
-    map7 LunarTask
+    map8 LunarTask
         (field "taskOwner" string)
         (field "title" string)
         (field "notes" string)
         (field "id" string)
         (field "period" int)
         (field "bitTags" int)
-        (field "completionEntries" (Json.Decode.list entryDecoder))
+        (field "completionEntries" (Decode.list entryDecoder))
+        (Decode.succeed AllYear)
 
 
 entryDecoder : Decoder Date.Date
 entryDecoder =
     entryInfoDecoder
-        |> Json.Decode.andThen
-            (\n -> Json.Decode.succeed (entryInfoToDate n))
+        |> Decode.andThen
+            (\n -> Decode.succeed (entryInfoToDate n))
 
 
 entryInfoDecoder : Decoder EntryInfo
@@ -274,6 +293,7 @@ genTaskWithOptions opts =
     , id = "1234567788"
     , period = opts.period
     , completionEntries = opts.entries
+    , allYearOrSeasonal = AllYear
     }
 
 
@@ -296,4 +316,5 @@ lunarTaskWithOneHundredCompletionEntries =
     , id = "1234567788"
     , period = 20
     , completionEntries = completionEntries
+    , allYearOrSeasonal = AllYear
     }
