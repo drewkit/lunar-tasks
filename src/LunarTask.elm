@@ -37,10 +37,7 @@ type alias SeasonEnd =
 
 type AllYearOrSeasonal
     = AllYear
-
-
-
--- | Seasonal SeasonStart SeasonEnd
+    | Seasonal SeasonStart SeasonEnd
 
 
 type alias LunarTask =
