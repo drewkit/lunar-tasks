@@ -22,6 +22,8 @@ module LunarTask exposing
     )
 
 import Date exposing (Date, Interval(..), Unit(..))
+import Html exposing (th)
+import Http exposing (task)
 import Json.Decode as Decode exposing (Decoder, field, int, map2, map7, map8, string)
 import Json.Encode as Encode
 import List exposing (length)
@@ -31,13 +33,13 @@ type alias SeasonStart =
     Int
 
 
-type alias SeasonEnd =
+type alias SeasonDuration =
     Int
 
 
 type AllYearOrSeasonal
     = AllYear
-    | Seasonal SeasonStart SeasonEnd
+    | Seasonal SeasonStart SeasonDuration
 
 
 type alias LunarTask =
@@ -136,13 +138,76 @@ removeCompletionEntry task dateEntry =
 getDaysPastDue : Date.Date -> LunarTask -> Int
 getDaysPastDue currentDate task =
     let
+        lastCompletedAt =
+            case task.allYearOrSeasonal of
+                Seasonal seasonStart seasonDuration ->
+                    case getSeasonalData currentDate seasonStart seasonDuration of
+                        NextSeason seasonStartDate _ ->
+                            seasonStartDate
+
+                        CurrentSeason seasonStartDate seasonEndDate ->
+                            let
+                                taskLastCompleted =
+                                    getLastCompletedAt task
+                            in
+                            if Date.isBetween seasonStartDate seasonEndDate taskLastCompleted then
+                                taskLastCompleted
+
+                            else
+                                seasonStartDate
+
+                AllYear ->
+                    getLastCompletedAt task
+
         dateDiff =
-            Date.diff Days (getLastCompletedAt task) currentDate
+            Date.diff Days lastCompletedAt currentDate
     in
     [ dateDiff - task.period ]
         |> (::) 0
         |> List.maximum
         |> Maybe.withDefault 0
+
+
+type SeasonalData
+    = CurrentSeason Date.Date Date.Date
+    | NextSeason Date.Date Date.Date
+
+
+getSeasonalData : Date.Date -> SeasonStart -> SeasonDuration -> SeasonalData
+getSeasonalData currentDate seasonStart seasonDuration =
+    let
+        currentYear =
+            Date.year currentDate
+
+        aSeasonStartDate =
+            Date.fromOrdinalDate (currentYear - 1) seasonStart
+
+        aSeasonEndDate =
+            Date.add Date.Days seasonDuration aSeasonStartDate
+
+        bSeasonStartDate =
+            Date.fromOrdinalDate currentYear seasonStart
+
+        bSeasonEndDate =
+            Date.add Date.Days seasonDuration bSeasonStartDate
+
+        cSeasonStartDate =
+            Date.fromOrdinalDate (currentYear + 1) seasonStart
+
+        cSeasonEndDate =
+            Date.add Date.Days seasonDuration cSeasonStartDate
+    in
+    if Date.isBetween aSeasonStartDate aSeasonEndDate currentDate then
+        CurrentSeason aSeasonStartDate aSeasonEndDate
+
+    else if Date.isBetween bSeasonStartDate bSeasonEndDate currentDate then
+        CurrentSeason bSeasonStartDate bSeasonEndDate
+
+    else if Date.isBetween aSeasonEndDate bSeasonStartDate currentDate then
+        NextSeason bSeasonStartDate bSeasonEndDate
+
+    else
+        NextSeason cSeasonStartDate cSeasonEndDate
 
 
 pastDue : Date.Date -> LunarTask -> Bool
