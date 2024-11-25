@@ -24,7 +24,7 @@ module LunarTask exposing
 import Date exposing (Date, Interval(..), Unit(..))
 import Html exposing (th)
 import Http exposing (task)
-import Json.Decode as Decode exposing (Decoder, field, int, map2, map7, map8, string)
+import Json.Decode as Decode exposing (Decoder, field, int, map2, map7, map8, oneOf, string)
 import Json.Encode as Encode
 import List exposing (length)
 
@@ -292,6 +292,17 @@ lunarTaskEncoder task =
             [ ( "year", Encode.int (Date.year date) )
             , ( "day", Encode.int (Date.ordinalDay date) )
             ]
+
+        allYearOrSeasonalToObject =
+            case task.allYearOrSeasonal of
+                AllYear ->
+                    Encode.null
+
+                Seasonal seasonStart seasonDuration ->
+                    Encode.object
+                        [ ( "seasonStart", Encode.int seasonStart )
+                        , ( "seasonDuration", Encode.int seasonDuration )
+                        ]
     in
     Encode.object
         [ ( "taskOwner", Encode.string task.taskOwner )
@@ -301,6 +312,7 @@ lunarTaskEncoder task =
         , ( "period", Encode.int task.period )
         , ( "bitTags", Encode.int task.bitTags )
         , ( "completionEntries", Encode.list Encode.object (List.map completionEntryToObject task.completionEntries) )
+        , ( "type", allYearOrSeasonalToObject )
         ]
 
 
@@ -314,7 +326,22 @@ lunarTaskDecoder =
         (field "period" int)
         (field "bitTags" int)
         (field "completionEntries" (Decode.list entryDecoder))
-        (Decode.succeed AllYear)
+        (field "type" allYearOrSeasonalDecoder)
+
+
+allYearOrSeasonalDecoder : Decoder AllYearOrSeasonal
+allYearOrSeasonalDecoder =
+    oneOf
+        [ seasonalDecoder
+        , Decode.succeed AllYear
+        ]
+
+
+seasonalDecoder : Decoder AllYearOrSeasonal
+seasonalDecoder =
+    map2 Seasonal
+        (field "seasonStart" int)
+        (field "seasonDuration" int)
 
 
 entryDecoder : Decoder Date.Date
