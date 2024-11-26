@@ -1,5 +1,8 @@
 module LunarTask exposing
-    ( LunarTask
+    ( AllYearOrSeasonal(..)
+    , AllYearOrSeasonalOption(..)
+    , LunarTask
+    , SeasonalData(..)
     , deleteTaskFromList
     , findTaskById
     , genTaskWithOptions
@@ -7,6 +10,8 @@ module LunarTask exposing
     , getHistoricalCadence
     , getLastCompletedAt
     , getNextPastDueDate
+    , getSeasonalData
+    , getTaskTypeOption
     , insertOrUpdateTask
     , lunarTaskDecoder
     , lunarTaskEncoder
@@ -20,10 +25,40 @@ module LunarTask exposing
     , removeCompletionEntry
     )
 
-import Date exposing (Interval(..), Unit(..))
-import Json.Decode exposing (Decoder, field, int, map2, map7, string)
+import Date exposing (Date, Interval(..), Unit(..))
+import Html exposing (th)
+import Http exposing (task)
+import Json.Decode as Decode exposing (Decoder, field, int, map2, map7, map8, oneOf, string)
 import Json.Encode as Encode
 import List exposing (length)
+
+
+type alias SeasonStart =
+    Int
+
+
+type alias SeasonDuration =
+    Int
+
+
+type AllYearOrSeasonal
+    = AllYear
+    | Seasonal SeasonStart SeasonDuration
+
+
+type AllYearOrSeasonalOption
+    = AllYearOption
+    | SeasonalOption
+
+
+getTaskTypeOption : LunarTask -> AllYearOrSeasonalOption
+getTaskTypeOption task =
+    case task.taskType of
+        AllYear ->
+            AllYearOption
+
+        Seasonal _ _ ->
+            SeasonalOption
 
 
 type alias LunarTask =
@@ -34,6 +69,7 @@ type alias LunarTask =
     , period : Int
     , bitTags : Int
     , completionEntries : List Date.Date
+    , taskType : AllYearOrSeasonal
     }
 
 
@@ -121,13 +157,76 @@ removeCompletionEntry task dateEntry =
 getDaysPastDue : Date.Date -> LunarTask -> Int
 getDaysPastDue currentDate task =
     let
+        lastCompletedAt =
+            case task.taskType of
+                Seasonal seasonStart seasonDuration ->
+                    case getSeasonalData currentDate seasonStart seasonDuration of
+                        NextSeason seasonStartDate _ ->
+                            seasonStartDate
+
+                        CurrentSeason seasonStartDate seasonEndDate ->
+                            let
+                                taskLastCompleted =
+                                    getLastCompletedAt task
+                            in
+                            if Date.isBetween seasonStartDate seasonEndDate taskLastCompleted then
+                                taskLastCompleted
+
+                            else
+                                seasonStartDate
+
+                AllYear ->
+                    getLastCompletedAt task
+
         dateDiff =
-            Date.diff Days (getLastCompletedAt task) currentDate
+            Date.diff Days lastCompletedAt currentDate
     in
     [ dateDiff - task.period ]
         |> (::) 0
         |> List.maximum
         |> Maybe.withDefault 0
+
+
+type SeasonalData
+    = CurrentSeason Date.Date Date.Date
+    | NextSeason Date.Date Date.Date
+
+
+getSeasonalData : Date.Date -> SeasonStart -> SeasonDuration -> SeasonalData
+getSeasonalData currentDate seasonStart seasonDuration =
+    let
+        currentYear =
+            Date.year currentDate
+
+        aSeasonStartDate =
+            Date.fromOrdinalDate (currentYear - 1) seasonStart
+
+        aSeasonEndDate =
+            Date.add Date.Days seasonDuration aSeasonStartDate
+
+        bSeasonStartDate =
+            Date.fromOrdinalDate currentYear seasonStart
+
+        bSeasonEndDate =
+            Date.add Date.Days seasonDuration bSeasonStartDate
+
+        cSeasonStartDate =
+            Date.fromOrdinalDate (currentYear + 1) seasonStart
+
+        cSeasonEndDate =
+            Date.add Date.Days seasonDuration cSeasonStartDate
+    in
+    if Date.isBetween aSeasonStartDate aSeasonEndDate currentDate then
+        CurrentSeason aSeasonStartDate aSeasonEndDate
+
+    else if Date.isBetween bSeasonStartDate bSeasonEndDate currentDate then
+        CurrentSeason bSeasonStartDate bSeasonEndDate
+
+    else if Date.isBetween aSeasonEndDate bSeasonStartDate currentDate then
+        NextSeason bSeasonStartDate bSeasonEndDate
+
+    else
+        NextSeason cSeasonStartDate cSeasonEndDate
 
 
 pastDue : Date.Date -> LunarTask -> Bool
@@ -212,6 +311,17 @@ lunarTaskEncoder task =
             [ ( "year", Encode.int (Date.year date) )
             , ( "day", Encode.int (Date.ordinalDay date) )
             ]
+
+        allYearOrSeasonalToObject =
+            case task.taskType of
+                AllYear ->
+                    Encode.null
+
+                Seasonal seasonStart seasonDuration ->
+                    Encode.object
+                        [ ( "seasonStart", Encode.int seasonStart )
+                        , ( "seasonDuration", Encode.int seasonDuration )
+                        ]
     in
     Encode.object
         [ ( "taskOwner", Encode.string task.taskOwner )
@@ -221,26 +331,43 @@ lunarTaskEncoder task =
         , ( "period", Encode.int task.period )
         , ( "bitTags", Encode.int task.bitTags )
         , ( "completionEntries", Encode.list Encode.object (List.map completionEntryToObject task.completionEntries) )
+        , ( "type", allYearOrSeasonalToObject )
         ]
 
 
 lunarTaskDecoder : Decoder LunarTask
 lunarTaskDecoder =
-    map7 LunarTask
+    map8 LunarTask
         (field "taskOwner" string)
         (field "title" string)
         (field "notes" string)
         (field "id" string)
         (field "period" int)
         (field "bitTags" int)
-        (field "completionEntries" (Json.Decode.list entryDecoder))
+        (field "completionEntries" (Decode.list entryDecoder))
+        (field "type" allYearOrSeasonalDecoder)
+
+
+allYearOrSeasonalDecoder : Decoder AllYearOrSeasonal
+allYearOrSeasonalDecoder =
+    oneOf
+        [ seasonalDecoder
+        , Decode.succeed AllYear
+        ]
+
+
+seasonalDecoder : Decoder AllYearOrSeasonal
+seasonalDecoder =
+    map2 Seasonal
+        (field "seasonStart" int)
+        (field "seasonDuration" int)
 
 
 entryDecoder : Decoder Date.Date
 entryDecoder =
     entryInfoDecoder
-        |> Json.Decode.andThen
-            (\n -> Json.Decode.succeed (entryInfoToDate n))
+        |> Decode.andThen
+            (\n -> Decode.succeed (entryInfoToDate n))
 
 
 entryInfoDecoder : Decoder EntryInfo
@@ -274,6 +401,7 @@ genTaskWithOptions opts =
     , id = "1234567788"
     , period = opts.period
     , completionEntries = opts.entries
+    , taskType = AllYear
     }
 
 
@@ -296,4 +424,5 @@ lunarTaskWithOneHundredCompletionEntries =
     , id = "1234567788"
     , period = 20
     , completionEntries = completionEntries
+    , taskType = AllYear
     }

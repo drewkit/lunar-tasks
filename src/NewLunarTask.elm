@@ -7,6 +7,7 @@ module NewLunarTask exposing
 
 import Date exposing (Unit(..))
 import Json.Encode as Encode
+import LunarTask exposing (AllYearOrSeasonal(..))
 
 
 type alias NewLunarTask r =
@@ -18,6 +19,7 @@ type alias NewLunarTask r =
         , demo : Maybe { demoId : Int }
         , currentDate : Date.Date
         , newTaskNotes : String
+        , newTaskType : AllYearOrSeasonal
     }
 
 
@@ -32,6 +34,7 @@ resetNewTask task =
         , newTaskCompletedAt = task.currentDate
         , newTaskPeriod = 20
         , newTaskNotes = ""
+        , newTaskType = AllYear
     }
 
 
@@ -74,6 +77,18 @@ newLunarTaskEncoder task =
                   , ( "day", Encode.int completionDay )
                   ]
                 ]
+
+        encodedTaskType : Encode.Value
+        encodedTaskType =
+            case task.newTaskType of
+                Seasonal seasonStart seasonDuration ->
+                    Encode.object
+                        [ ( "seasonStart", Encode.int seasonStart )
+                        , ( "seasonDuration", Encode.int seasonDuration )
+                        ]
+
+                AllYear ->
+                    Encode.null
     in
     case task.demo of
         Just demoData ->
@@ -85,6 +100,7 @@ newLunarTaskEncoder task =
                 , ( "completionEntries", completionEntries )
                 , ( "id", Encode.string (String.fromInt demoData.demoId) )
                 , ( "bitTags", Encode.int 0 )
+                , ( "type", encodedTaskType )
                 ]
 
         Nothing ->
@@ -94,4 +110,5 @@ newLunarTaskEncoder task =
                 , ( "period", Encode.int task.newTaskPeriod )
                 , ( "notes", Encode.string task.newTaskNotes )
                 , ( "completionEntries", completionEntries )
+                , ( "type", encodedTaskType )
                 ]

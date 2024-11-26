@@ -6,6 +6,7 @@
       "notes": "",
       "period": 25,
       "bitTags": 0,
+      "type": "",
       "completionEntries": [
         {
           "year": 2023,
@@ -28,6 +29,7 @@
       "notes": "",
       "period": 60,
       "bitTags": 1,
+      "type": "",
       "completionEntries": [
         {
           "year": 2023,
@@ -44,7 +46,11 @@
       "id": "xim7by2fplqt352",
       "title": "liquid fertilizer run on plants",
       "notes": "",
-      "period": 300,
+      "period": 30,
+      "type": {
+        "seasonStart": 34,
+        "seasonDuration": 90
+      },
       "bitTags": 2,
       "completionEntries": [
         {
@@ -64,14 +70,18 @@
       "notes": "",
       "period": 20,
       "bitTags": 2,
+      "type": {
+        "seasonStart": 150,
+        "seasonDuration": 90
+      },
       "completionEntries": [
         {
           "year": 2023,
-          "day": 260
+          "day": 220
         },
         {
           "year": 2023,
-          "day": 121
+          "day": 180
         }
       ]
     },
@@ -82,6 +92,7 @@
       "notes": "",
       "period": 30,
       "bitTags": 1,
+      "type": "",
       "completionEntries": [
         {
           "year": 2023,
@@ -96,6 +107,7 @@
       "notes": "",
       "period": 300,
       "bitTags": 1,
+      "type": "",
       "completionEntries": [
         {
           "year": 2022,
@@ -110,6 +122,10 @@
       "notes": "",
       "period": 200,
       "bitTags": 2,
+      "type": {
+        "seasonStart": 130,
+        "seasonDuration": 200
+      },
       "completionEntries": [
         {
           "year": 2023,
@@ -124,6 +140,7 @@
       "notes": "",
       "period": 200,
       "bitTags": 1,
+      "type": null,
       "completionEntries": [
         {
           "year": 2023,
@@ -138,6 +155,7 @@
       "notes": "",
       "period": 200,
       "bitTags": 1,
+      "type": {},
       "completionEntries": [
         {
           "year": 2023,
@@ -152,10 +170,14 @@
       "notes": "",
       "period": 312,
       "bitTags": 0,
+      "type": {
+        "seasonStart": 150,
+        "seasonDuration": 100
+      },
       "completionEntries": [
         {
           "year": 2021,
-          "day": 307
+          "day": 240
         }
       ]
     },
@@ -166,6 +188,7 @@
       "notes": "",
       "period": 180,
       "bitTags": 1,
+      "type": "",
       "completionEntries": [
         {
           "year": 2023,
@@ -180,6 +203,10 @@
       "notes": "",
       "period": 12,
       "bitTags": 2,
+      "type": {
+        "seasonStart": 150,
+        "seasonDuration": 150
+      },
       "completionEntries": [
         {
           "year": 2023,
@@ -198,6 +225,7 @@
       "notes": "",
       "period": 150,
       "bitTags": 1,
+      "type": "",
       "completionEntries": [
         {
           "year": 2023,
@@ -212,6 +240,7 @@
       "notes": "",
       "period": 180,
       "bitTags": 1,
+      "type": "",
       "completionEntries": [
         {
           "year": 2023,
@@ -226,6 +255,10 @@
       "notes": "",
       "period": 30,
       "bitTags": 2,
+      "type": {
+        "seasonStart": 85,
+        "seasonDuration": 260
+      },
       "completionEntries": [
         {
           "year": 2023,
@@ -248,6 +281,7 @@
       "notes": "",
       "period": 15,
       "bitTags": 1,
+      "type": "",
       "completionEntries": [
         {
           "year": 2023,
@@ -266,6 +300,7 @@
       "notes": "",
       "period": 60,
       "bitTags": 1,
+      "type": "",
       "completionEntries": [
         {
           "year": 2023,
@@ -284,6 +319,7 @@
       "notes": "",
       "period": 365,
       "bitTags": 1,
+      "type": "",
       "completionEntries": [
         {
           "year": 2023,
@@ -298,6 +334,7 @@
       "notes": "",
       "period": 300,
       "bitTags": 1,
+      "type": "",
       "completionEntries": [
         {
           "year": 2023,
@@ -312,6 +349,7 @@
       "notes": "",
       "period": 200,
       "bitTags": 4,
+      "type": "",
       "completionEntries": [
         {
           "year": 2023,
@@ -326,6 +364,7 @@
       "notes": "",
       "period": 500,
       "bitTags": 2,
+      "type": "",
       "completionEntries": [
         {
           "year": 2021,
@@ -340,6 +379,7 @@
       "notes": "",
       "period": 40,
       "bitTags": 0,
+      "type": "",
       "completionEntries": [
         {
           "year": 2023,
