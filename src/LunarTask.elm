@@ -2,6 +2,7 @@ module LunarTask exposing
     ( AllYearOrSeasonal(..)
     , AllYearOrSeasonalOption(..)
     , LunarTask
+    , SeasonalData(..)
     , deleteTaskFromList
     , findTaskById
     , genTaskWithOptions
@@ -9,6 +10,7 @@ module LunarTask exposing
     , getHistoricalCadence
     , getLastCompletedAt
     , getNextPastDueDate
+    , getSeasonalData
     , getTaskTypeOption
     , insertOrUpdateTask
     , lunarTaskDecoder

@@ -1728,12 +1728,41 @@ viewTask model editingNotes =
                                 }
 
                         Seasonal seasonStart seasonDuration ->
+                            let
+                                seasonalData =
+                                    getSeasonalData
+                                        model.currentDate
+                                        seasonStart
+                                        seasonDuration
+
+                                ( seasonStartMessage, seasonDurationMessage ) =
+                                    case seasonalData of
+                                        CurrentSeason start end ->
+                                            ( "This season started on " ++ Date.toIsoString start
+                                            , "This season ends on " ++ Date.toIsoString end
+                                            )
+
+                                        NextSeason start end ->
+                                            ( "Next season starts on " ++ Date.toIsoString start
+                                            , "Next season ends on " ++ Date.toIsoString end
+                                            )
+                            in
                             column []
                                 [ Input.text []
                                     { label =
                                         Input.labelAbove
+                                            [ Font.semiBold
+                                            ]
+                                            (text "Period (in days)")
+                                    , onChange = EditTaskPeriod
+                                    , text = String.fromInt task.period
+                                    , placeholder = Nothing
+                                    }
+                                , Input.text []
+                                    { label =
+                                        Input.labelAbove
                                             [ Font.semiBold ]
-                                            (text "Season Start")
+                                            (text <| "Ordinal Season Start (" ++ seasonStartMessage ++ ")")
                                     , onChange = EditSeasonStart
                                     , text = String.fromInt seasonStart
                                     , placeholder = Nothing
@@ -1742,7 +1771,7 @@ viewTask model editingNotes =
                                     { label =
                                         Input.labelAbove
                                             [ Font.semiBold ]
-                                            (text "Season Duration")
+                                            (text <| "Season Duration in Days (" ++ seasonDurationMessage ++ ")")
                                     , onChange = EditSeasonDuration
                                     , text = String.fromInt seasonDuration
                                     , placeholder = Nothing
