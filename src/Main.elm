@@ -105,6 +105,8 @@ type alias Model =
     , newTaskNotes : String
     , newTaskPeriod : Int
     , newTaskCompletedAt : Date.Date
+    , newTaskType : AllYearOrSeasonal
+    , taskTypeOption : AllYearOrSeasonalOption
     , banner : String
     , editedTask : Maybe LunarTask
     , tagSettings : BitFlagSettings
@@ -325,6 +327,8 @@ initWithMaybeNavKey ( currentTimeinMillis, validAuth ) url maybeKey =
             , newTaskNotes = ""
             , newTaskPeriod = 15
             , newTaskCompletedAt = currentDate
+            , newTaskType = AllYear
+            , taskTypeOption = AllYearOption
             , banner = ""
             , editedTask = Nothing
             , demo = Nothing
@@ -379,6 +383,8 @@ type Msg
     | NewTaskUpdatePeriod String
     | NewTaskSetDatePicker DatePicker.Msg
     | EditTaskPeriod String
+    | EditSeasonStart String
+    | EditSeasonDuration String
     | EditTaskDisableTag String
     | EditTaskEnableTag String
     | EditTaskTitle String
@@ -387,6 +393,7 @@ type Msg
     | EditTaskAddCompletionEntry DatePicker.Msg
     | EditTaskCancel
     | EditTaskSave
+    | EditTaskType AllYearOrSeasonalOption
     | EditTask String
     | EditTaskChangedTagSearchBox (SearchBox.ChangeEvent String)
     | DeleteTask LunarTask
@@ -700,7 +707,7 @@ update msg model =
                             , id = "asdfasdf"
                             , bitTags = 0
                             , taskOwner = "alksdjflasd"
-                            , allYearOrSeasonal = AllYear
+                            , taskType = AllYear
                             }
 
                         originalTask =
@@ -724,6 +731,31 @@ update msg model =
 
                     else
                         ( { model | editedTask = Nothing, view = LoadedTasksView MainTasksView }, Cmd.none )
+
+        EditTaskType taskTypeOption ->
+            case model.editedTask of
+                Just task ->
+                    case taskTypeOption of
+                        AllYearOption ->
+                            ( { model
+                                | taskTypeOption = taskTypeOption
+                                , editedTask =
+                                    Just { task | taskType = AllYear }
+                              }
+                            , Cmd.none
+                            )
+
+                        SeasonalOption ->
+                            ( { model
+                                | taskTypeOption = taskTypeOption
+                                , editedTask =
+                                    Just { task | taskType = Seasonal 100 200 }
+                              }
+                            , Cmd.none
+                            )
+
+                Nothing ->
+                    ( model, Cmd.none )
 
         EditTaskRemoveCompletionEntry entryDate ->
             case model.editedTask of
@@ -851,6 +883,56 @@ update msg model =
             case model.editedTask of
                 Just task ->
                     ( { model | editedTask = Just { task | period = period } }, Cmd.none )
+
+                Nothing ->
+                    ( model, Cmd.none )
+
+        EditSeasonStart seasonStartString ->
+            let
+                seasonStart =
+                    Maybe.withDefault 10 (String.toInt seasonStartString)
+            in
+            case model.editedTask of
+                Just task ->
+                    case task.taskType of
+                        AllYear ->
+                            ( model, Cmd.none )
+
+                        Seasonal _ seasonDuration ->
+                            ( { model
+                                | editedTask =
+                                    Just
+                                        { task
+                                            | taskType = Seasonal seasonStart seasonDuration
+                                        }
+                              }
+                            , Cmd.none
+                            )
+
+                Nothing ->
+                    ( model, Cmd.none )
+
+        EditSeasonDuration seasonDurationString ->
+            let
+                seasonDuration =
+                    Maybe.withDefault 10 (String.toInt seasonDurationString)
+            in
+            case model.editedTask of
+                Just task ->
+                    case task.taskType of
+                        AllYear ->
+                            ( model, Cmd.none )
+
+                        Seasonal seasonStart _ ->
+                            ( { model
+                                | editedTask =
+                                    Just
+                                        { task
+                                            | taskType = Seasonal seasonStart seasonDuration
+                                        }
+                              }
+                            , Cmd.none
+                            )
 
                 Nothing ->
                     ( model, Cmd.none )
@@ -1631,6 +1713,42 @@ viewTask model editingNotes =
 
         Just task ->
             let
+                taskTypeInput =
+                    case task.taskType of
+                        AllYear ->
+                            Input.text []
+                                { label =
+                                    Input.labelAbove
+                                        [ Font.semiBold
+                                        ]
+                                        (text "Period (in days)")
+                                , onChange = EditTaskPeriod
+                                , text = String.fromInt task.period
+                                , placeholder = Nothing
+                                }
+
+                        Seasonal seasonStart seasonDuration ->
+                            column []
+                                [ Input.text []
+                                    { label =
+                                        Input.labelAbove
+                                            [ Font.semiBold ]
+                                            (text "Season Start")
+                                    , onChange = EditSeasonStart
+                                    , text = String.fromInt seasonStart
+                                    , placeholder = Nothing
+                                    }
+                                , Input.text []
+                                    { label =
+                                        Input.labelAbove
+                                            [ Font.semiBold ]
+                                            (text "Season Duration")
+                                    , onChange = EditSeasonDuration
+                                    , text = String.fromInt seasonDuration
+                                    , placeholder = Nothing
+                                    }
+                                ]
+
                 historicalCadenceMsg =
                     case getHistoricalCadence task of
                         Nothing ->
@@ -1650,12 +1768,19 @@ viewTask model editingNotes =
                     [ button buttonAttrs { label = text "Save", onPress = Just EditTaskSave }
                     , button buttonAttrs { label = text "Cancel", onPress = Just EditTaskCancel }
                     ]
-                , Input.text []
-                    { label = Input.labelAbove [ Font.semiBold ] (text "Cadence (in days)")
-                    , onChange = EditTaskPeriod
-                    , text = String.fromInt task.period
-                    , placeholder = Nothing
+                , Input.radioRow
+                    [ padding 10
+                    , spacing 20
+                    ]
+                    { onChange = EditTaskType
+                    , selected = Just (getTaskTypeOption task)
+                    , label = Input.labelAbove [ Font.semiBold ] (text "Cadence")
+                    , options =
+                        [ Input.option AllYearOption (text "All Year")
+                        , Input.option SeasonalOption (text "Seasonal")
+                        ]
                     }
+                , taskTypeInput
                 , el [ Font.bold ] (text "Notes")
                 , notesField task.notes
                 , column []

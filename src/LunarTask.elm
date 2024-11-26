@@ -1,5 +1,6 @@
 module LunarTask exposing
     ( AllYearOrSeasonal(..)
+    , AllYearOrSeasonalOption(..)
     , LunarTask
     , deleteTaskFromList
     , findTaskById
@@ -8,6 +9,7 @@ module LunarTask exposing
     , getHistoricalCadence
     , getLastCompletedAt
     , getNextPastDueDate
+    , getTaskTypeOption
     , insertOrUpdateTask
     , lunarTaskDecoder
     , lunarTaskEncoder
@@ -42,6 +44,21 @@ type AllYearOrSeasonal
     | Seasonal SeasonStart SeasonDuration
 
 
+type AllYearOrSeasonalOption
+    = AllYearOption
+    | SeasonalOption
+
+
+getTaskTypeOption : LunarTask -> AllYearOrSeasonalOption
+getTaskTypeOption task =
+    case task.taskType of
+        AllYear ->
+            AllYearOption
+
+        Seasonal _ _ ->
+            SeasonalOption
+
+
 type alias LunarTask =
     { taskOwner : String
     , title : String
@@ -50,7 +67,7 @@ type alias LunarTask =
     , period : Int
     , bitTags : Int
     , completionEntries : List Date.Date
-    , allYearOrSeasonal : AllYearOrSeasonal
+    , taskType : AllYearOrSeasonal
     }
 
 
@@ -139,7 +156,7 @@ getDaysPastDue : Date.Date -> LunarTask -> Int
 getDaysPastDue currentDate task =
     let
         lastCompletedAt =
-            case task.allYearOrSeasonal of
+            case task.taskType of
                 Seasonal seasonStart seasonDuration ->
                     case getSeasonalData currentDate seasonStart seasonDuration of
                         NextSeason seasonStartDate _ ->
@@ -294,7 +311,7 @@ lunarTaskEncoder task =
             ]
 
         allYearOrSeasonalToObject =
-            case task.allYearOrSeasonal of
+            case task.taskType of
                 AllYear ->
                     Encode.null
 
@@ -382,7 +399,7 @@ genTaskWithOptions opts =
     , id = "1234567788"
     , period = opts.period
     , completionEntries = opts.entries
-    , allYearOrSeasonal = AllYear
+    , taskType = AllYear
     }
 
 
@@ -405,5 +422,5 @@ lunarTaskWithOneHundredCompletionEntries =
     , id = "1234567788"
     , period = 20
     , completionEntries = completionEntries
-    , allYearOrSeasonal = AllYear
+    , taskType = AllYear
     }
