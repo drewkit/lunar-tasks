@@ -1668,8 +1668,7 @@ viewTask model editingNotes =
                     Markdown.default notes
                         |> Result.map
                             (Element.column
-                                [ onClick ToggleNoteEdit
-                                , Element.width Element.fill
+                                [ Element.width Element.fill
                                 , Border.width 1
                                 , Element.alignLeft
                                 , Element.alignTop
@@ -1810,7 +1809,14 @@ viewTask model editingNotes =
                         ]
                     }
                 , taskTypeInput
-                , el [ Font.bold ] (text "Notes")
+                , if editingNotes then
+                    el [ Font.bold ] (text "Notes")
+
+                  else
+                    row []
+                        [ el [ Font.bold ] (text "Notes ")
+                        , el [ onClick ToggleNoteEdit ] (Icon.edit |> Icon.toHtml [] |> Element.html)
+                        ]
                 , notesField task.notes
                 , column []
                     [ el [ Font.bold ] (text "Tags")
