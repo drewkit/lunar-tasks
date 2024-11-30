@@ -10,12 +10,30 @@ import Url.Parser exposing ((<?>), Parser)
 import Url.Parser.Query as QueryParser
 
 
+type alias SavedView =
+    { filter : ListFilter
+    , sort : ListSort
+    , tagsSelected : ( Set Int, Set Int )
+    , searchTerm : Maybe String
+    }
+
+
+genSavedView : SavedView
+genSavedView =
+    { filter = FilterAll
+    , sort = NoSort DESC
+    , tagsSelected = ( Set.empty, Set.empty )
+    , searchTerm = Nothing
+    }
+
+
 type alias ListSettings r =
     { r
         | filter : ListFilter
         , sort : ListSort
         , tagsSelected : ( Set String, Set String )
         , searchTerm : Maybe String
+        , savedViews : ( SavedView, List SavedView )
     }
 
 

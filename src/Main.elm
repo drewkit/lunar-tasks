@@ -100,6 +100,7 @@ type alias Model =
     , sort : ListSort
     , tagsSelected : ( Set String, Set String )
     , searchTerm : Maybe String
+    , savedViews : ( SavedView, List SavedView )
     , view : ViewState
     , newTaskTitle : String
     , newTaskNotes : String
@@ -321,6 +322,7 @@ initWithMaybeNavKey ( currentTimeinMillis, validAuth ) url maybeKey =
             , tagsSelected = ( Set.empty, Set.empty )
             , tagSettings = BitFlags.defaultSettings 25
             , searchTerm = Nothing
+            , savedViews = ( genSavedView, [] )
             , datePicker = newDatePicker
             , view = loadingOrLoginView
             , newTaskTitle = ""
