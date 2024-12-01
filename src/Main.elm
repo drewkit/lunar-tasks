@@ -2363,7 +2363,8 @@ viewTagButton tagToggleState tag =
             let
                 blacklistedAttrs =
                     [ Background.color color.darkCharcoal
-                    , Font.color color.red
+                    , Font.color color.white
+                    , Font.strike
                     ]
                         ++ baseButtonAttrs
             in
