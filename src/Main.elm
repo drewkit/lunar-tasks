@@ -1345,6 +1345,7 @@ update msg model =
 -- VIEW
 
 
+theme : Theme.Theme ()
 theme =
     Theme.defaultTheme
 
@@ -1457,9 +1458,9 @@ viewHeader model =
 viewMoon : Element msg
 viewMoon =
     Icon.moon
-        |> Icon.withSize 4
+        |> Icon.withSize 3
         |> Icon.withSizeUnit "em"
-        |> Icon.withStrokeWidth 1
+        |> Icon.withStrokeWidth 0.8
         |> Icon.toHtml []
         |> Element.html
 
