@@ -1878,26 +1878,23 @@ viewLandingBulletPoint icon message =
     in
     column
         [ height fill
-        , spacingXY 0 30
         , paddingXY 0 30
+        , spacingXY 0 30
         ]
         [ el [ centerX ] elIcon
-        , paragraph [ width (fill |> minimum 350), paddingXY 10 0 ] [ text message ]
+        , paragraph
+            [ width (fill |> minimum 350)
+            , paddingXY 10 0
+            ]
+            [ Material.text theme (Text.headlineMedium message) ]
         ]
 
 
 viewLandingPage : Element Msg
 viewLandingPage =
     wrappedRow
-        [ paddingXY 175 100
-        , Font.size 28
-        , Font.italic
-        , Font.extraLight
-        , Font.glow color.blue 0.8
-        , Font.family
-            [ Font.sansSerif
-            , Font.typeface "Roboto"
-            ]
+        [ spacing 30
+        , paddingXY 175 100
         , spaceEvenly
         ]
         [ viewLandingBulletPoint
