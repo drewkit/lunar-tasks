@@ -2204,18 +2204,22 @@ viewTaskDiscovery model =
                 , label = Icon.x |> Icon.toHtml [] |> Element.html
                 }
 
-        displayResetOption : Bool
-        displayResetOption =
-            (model.filter == FilterAll)
-                && (model.sort == NoSort DESC)
-                && (model.searchTerm == Nothing)
+        hideResetOption : Bool
+        hideResetOption =
+            let
+                ( savedView, _ ) =
+                    model.savedViews
+            in
+            (model.filter == savedView.filter)
+                && (model.sort == savedView.sort)
+                && (model.searchTerm == savedView.searchTerm)
                 && Set.isEmpty (Tuple.first model.tagsSelected)
                 && Set.isEmpty (Tuple.second model.tagsSelected)
 
         resetOption =
             button
-                [ transparent displayResetOption ]
-                { label = text "(x) reset all selections", onPress = Just FilterReset }
+                [ transparent hideResetOption ]
+                { label = text "(x) reset to default view", onPress = Just FilterReset }
 
         getTagState : String -> TagToggleState
         getTagState tag =
