@@ -321,12 +321,20 @@ initWithMaybeNavKey ( currentTimeinMillis, validAuth ) url maybeKey =
             , taskOwner = ""
             , currentDate = currentDate
             , currentZone = currentZone
+
+            -- filter will be overridden on init with default saved view
             , filter = FilterAll
+
+            -- sort will be overridden on init with default saved view
             , sort = NoSort DESC
+
+            -- tags selected will be overridden on init with default saved view
             , tagsSelected = ( 0, 0 )
             , tagSettings = BitFlags.defaultSettings 25
+
+            -- search term will be overridden on init with default saved view
             , searchTerm = Nothing
-            , savedViews = ( genSavedView, [] )
+            , savedViews = ( defaultSavedView, [] )
             , datePicker = newDatePicker
             , datePickerForManualPastDue = newDatePickerForManualPastDue
             , view = loadingOrLoginView
@@ -2207,15 +2215,15 @@ viewTaskDiscovery model =
         hideResetOption : Bool
         hideResetOption =
             let
-                ( savedView, _ ) =
+                ( defaultSavedView, _ ) =
                     model.savedViews
             in
-            (model.filter == savedView.filter)
-                && (model.sort == savedView.sort)
-                && (model.searchTerm == savedView.searchTerm)
-                && Tuple.first savedView.tagsSelected
+            (model.filter == defaultSavedView.filter)
+                && (model.sort == defaultSavedView.sort)
+                && (model.searchTerm == defaultSavedView.searchTerm)
+                && Tuple.first defaultSavedView.tagsSelected
                 == Tuple.first model.tagsSelected
-                && Tuple.second savedView.tagsSelected
+                && Tuple.second defaultSavedView.tagsSelected
                 == Tuple.second model.tagsSelected
 
         resetOption =
