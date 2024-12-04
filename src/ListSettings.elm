@@ -19,12 +19,22 @@ type alias SavedView =
     }
 
 
-genSavedView : SavedView
-genSavedView =
-    { filter = FilterAll
+defaultSavedView : SavedView
+defaultSavedView =
+    { filter = FilterPastDue
     , sort = NoSort DESC
     , tagsSelected = ( 0, 0 )
-    , searchTerm = Nothing
+    , searchTerm = Just "hi"
+    }
+
+
+setSavedView : SavedView -> ListSettings r -> ListSettings r
+setSavedView savedView listSettings =
+    { listSettings
+        | filter = savedView.filter
+        , sort = savedView.sort
+        , tagsSelected = savedView.tagsSelected
+        , searchTerm = savedView.searchTerm
     }
 
 
@@ -66,11 +76,15 @@ updateListFilter listSettings filterSetting =
 
 resetFilter : ListSettings r -> ListSettings r
 resetFilter listSettings =
+    let
+        ( defaultView, _ ) =
+            listSettings.savedViews
+    in
     { listSettings
-        | filter = FilterAll
-        , sort = NoSort DESC
-        , tagsSelected = ( 0, 0 )
-        , searchTerm = Nothing
+        | filter = defaultView.filter
+        , sort = defaultView.sort
+        , tagsSelected = defaultView.tagsSelected
+        , searchTerm = defaultView.searchTerm
     }
 
 
