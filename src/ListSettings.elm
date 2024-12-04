@@ -1,5 +1,6 @@
 module ListSettings exposing (..)
 
+import BitFlags
 import Date
 import Dict
 import LunarTask exposing (..)
@@ -13,7 +14,7 @@ import Url.Parser.Query as QueryParser
 type alias SavedView =
     { filter : ListFilter
     , sort : ListSort
-    , tagsSelected : ( Set Int, Set Int )
+    , tagsSelected : ( Int, Int )
     , searchTerm : Maybe String
     }
 
@@ -22,7 +23,7 @@ genSavedView : SavedView
 genSavedView =
     { filter = FilterAll
     , sort = NoSort DESC
-    , tagsSelected = ( Set.empty, Set.empty )
+    , tagsSelected = ( 0, 0 )
     , searchTerm = Nothing
     }
 
@@ -31,9 +32,10 @@ type alias ListSettings r =
     { r
         | filter : ListFilter
         , sort : ListSort
-        , tagsSelected : ( Set String, Set String )
+        , tagsSelected : ( Int, Int )
         , searchTerm : Maybe String
         , savedViews : ( SavedView, List SavedView )
+        , tagSettings : BitFlags.BitFlagSettings
     }
 
 
@@ -67,7 +69,7 @@ resetFilter listSettings =
     { listSettings
         | filter = FilterAll
         , sort = NoSort DESC
-        , tagsSelected = ( Set.empty, Set.empty )
+        , tagsSelected = ( 0, 0 )
         , searchTerm = Nothing
     }
 
@@ -80,28 +82,41 @@ updateSort listSort listSettings =
 toggleTag : String -> ListSettings r -> ListSettings r
 toggleTag tag listSettings =
     let
-        ( whitelistTags, blacklistTags ) =
+        ( whitelistRegister, blacklistRegister ) =
             listSettings.tagsSelected
 
+        getEnabledFlags =
+            listSettings.tagSettings
+                |> BitFlags.enabledFlags
+
+        ( whitelistTags, blacklistTags ) =
+            ( getEnabledFlags whitelistRegister
+            , getEnabledFlags blacklistRegister
+            )
+
         whitelistMember =
-            Set.member tag whitelistTags
+            List.member tag whitelistTags
 
         blacklistMember =
-            Set.member tag blacklistTags
+            List.member tag blacklistTags
+
+        flipTag =
+            listSettings.tagSettings
+                |> BitFlags.flipFlag
     in
     case ( whitelistMember, blacklistMember ) of
         ( False, False ) ->
-            { listSettings | tagsSelected = ( Set.insert tag whitelistTags, blacklistTags ) }
+            { listSettings | tagsSelected = ( flipTag tag whitelistRegister, blacklistRegister ) }
 
         ( True, False ) ->
-            { listSettings | tagsSelected = ( Set.remove tag whitelistTags, Set.insert tag blacklistTags ) }
+            { listSettings | tagsSelected = ( flipTag tag whitelistRegister, flipTag tag blacklistRegister ) }
 
         ( False, True ) ->
-            { listSettings | tagsSelected = ( whitelistTags, Set.remove tag blacklistTags ) }
+            { listSettings | tagsSelected = ( whitelistRegister, flipTag tag blacklistRegister ) }
 
         -- revisit this to make impossible states impossible
         ( True, True ) ->
-            { listSettings | tagsSelected = ( Set.remove tag whitelistTags, Set.remove tag blacklistTags ) }
+            { listSettings | tagsSelected = ( flipTag tag blacklistRegister, flipTag tag blacklistRegister ) }
 
 
 toggleSortOrder : ListSettings r -> ListSettings r
@@ -320,11 +335,17 @@ filterToQueryParam listFilter =
 generateQueryParams : ListSettings r -> String
 generateQueryParams listSettings =
     let
-        ( whitelist, blacklist ) =
+        ( whitelistRegister, blacklistRegister ) =
             listSettings.tagsSelected
 
+        showEnabledTags =
+            listSettings.tagSettings
+                |> BitFlags.enabledFlags
+
         ( whitelistStr, blacklistStr ) =
-            ( String.join "," (Set.toList whitelist), String.join "," (Set.toList blacklist) )
+            ( String.join "," (showEnabledTags whitelistRegister)
+            , String.join "," (showEnabledTags blacklistRegister)
+            )
 
         buildIfNotDefault defaultVal val builder acc =
             if defaultVal == val then
@@ -340,8 +361,8 @@ generateQueryParams listSettings =
                 |> buildIfNotDefault (NoSort DESC) listSettings.sort (Builder.string "order" sortOrder)
                 |> buildIfNotDefault FilterAll listSettings.filter (Builder.string "filter" (filterToQueryParam listSettings.filter))
                 |> buildIfNotDefault Nothing listSettings.searchTerm (Builder.string "q" (Maybe.withDefault "" listSettings.searchTerm))
-                |> buildIfNotDefault Set.empty whitelist (Builder.string "whitelist" whitelistStr)
-                |> buildIfNotDefault Set.empty blacklist (Builder.string "blacklist" blacklistStr)
+                |> buildIfNotDefault 0 whitelistRegister (Builder.string "whitelist" whitelistStr)
+                |> buildIfNotDefault 0 blacklistRegister (Builder.string "blacklist" blacklistStr)
                 |> Builder.toQuery
 
 
@@ -429,12 +450,14 @@ initListSettingsFromQueryParams url listSettings =
 
         selectedTags =
             Url.Parser.parse selectedTagsParser url
+                |> Maybe.withDefault ( Set.empty, Set.empty )
+                |> (\( a, b ) -> ( BitFlags.genRegister listSettings.tagSettings a, BitFlags.genRegister listSettings.tagSettings b ))
     in
     { listSettings
         | sort = Maybe.withDefault (NoSort DESC) sort
         , filter = Maybe.withDefault FilterAll filter
         , searchTerm = Maybe.withDefault Nothing search
-        , tagsSelected = Maybe.withDefault ( Set.empty, Set.empty ) selectedTags
+        , tagsSelected = selectedTags
     }
 
 

@@ -98,7 +98,7 @@ type alias Model =
     , currentZone : Time.Zone
     , filter : ListFilter
     , sort : ListSort
-    , tagsSelected : ( Set String, Set String )
+    , tagsSelected : ( Int, Int )
     , searchTerm : Maybe String
     , savedViews : ( SavedView, List SavedView )
     , view : ViewState
@@ -323,7 +323,7 @@ initWithMaybeNavKey ( currentTimeinMillis, validAuth ) url maybeKey =
             , currentZone = currentZone
             , filter = FilterAll
             , sort = NoSort DESC
-            , tagsSelected = ( Set.empty, Set.empty )
+            , tagsSelected = ( 0, 0 )
             , tagSettings = BitFlags.defaultSettings 25
             , searchTerm = Nothing
             , savedViews = ( genSavedView, [] )
@@ -2213,8 +2213,10 @@ viewTaskDiscovery model =
             (model.filter == savedView.filter)
                 && (model.sort == savedView.sort)
                 && (model.searchTerm == savedView.searchTerm)
-                && Set.isEmpty (Tuple.first model.tagsSelected)
-                && Set.isEmpty (Tuple.second model.tagsSelected)
+                && Tuple.first savedView.tagsSelected
+                == Tuple.first model.tagsSelected
+                && Tuple.second savedView.tagsSelected
+                == Tuple.second model.tagsSelected
 
         resetOption =
             button
@@ -2224,8 +2226,14 @@ viewTaskDiscovery model =
         getTagState : String -> TagToggleState
         getTagState tag =
             let
+                showEnabledTags =
+                    model.tagSettings
+                        |> BitFlags.enabledFlags
+
                 ( whitelistedTags, blacklistedTags ) =
                     model.tagsSelected
+                        |> Tuple.mapBoth showEnabledTags showEnabledTags
+                        |> Tuple.mapBoth Set.fromList Set.fromList
             in
             if Set.member tag whitelistedTags then
                 Whitelisted
@@ -2286,12 +2294,17 @@ viewTaskDiscovery model =
 viewMain : Model -> Element Msg
 viewMain model =
     let
+        enabledFlags =
+            model.tagSettings
+                |> BitFlags.enabledFlags
+
         ( whitelistedTags, blacklistedTags ) =
             model.tagsSelected
+                |> Tuple.mapBoth enabledFlags enabledFlags
 
         tasks =
             model.tasks
-                |> filterByTags (BitFlags.match model.tagSettings (Set.toList whitelistedTags) (Set.toList blacklistedTags))
+                |> filterByTags (BitFlags.match model.tagSettings whitelistedTags blacklistedTags)
                 |> filterTaskList model.filter model.currentDate
                 |> filterByTerm model.searchTerm
                 |> sortTaskList model.sort model.currentDate
