@@ -1398,6 +1398,13 @@ viewLayout model innerContent =
 
 viewHeader : Model -> Element Msg
 viewHeader model =
+    let
+        headerFontColor =
+            color.darkBlue
+
+        headerBackgroundColor =
+            color.lightBlue
+    in
     column
         [ height <| fillPortion 2
         , width fill
@@ -1405,14 +1412,14 @@ viewHeader model =
         [ row
             [ width fill
             , padding 20
-            , Background.color color.lightBlue
+            , Background.color headerBackgroundColor
             ]
             [ row [ onClick ReturnToMain ]
-                [ viewMoon
+                [ el [ Font.color headerFontColor ] viewMoon
                 , el
                     [ Font.size 55
                     , paddingXY 15 0
-                    , Font.glow color.blue 0.3
+                    , Font.color headerFontColor
                     ]
                     (text "LunarTasks")
                 ]
@@ -1918,7 +1925,7 @@ viewLandingPage =
         , Font.size 28
         , Font.italic
         , Font.extraLight
-        , Font.glow color.blue 0.8
+        , Font.color color.darkBlue
         , Font.family
             [ Font.sansSerif
             , Font.typeface "Roboto"
@@ -2170,6 +2177,7 @@ type alias Colors =
     , darkCharcoal : Color
     , green : Color
     , lightBlue : Color
+    , darkBlue : Color
     , lightGrey : Color
     , orange : Color
     , red : Color
@@ -2185,6 +2193,7 @@ color =
     , darkCharcoal = rgb255 0x2E 0x34 0x36
     , green = rgb255 0x20 0xBF 0x55
     , lightBlue = rgb255 0xC5 0xE8 0xF7
+    , darkBlue = rgb255 0x1C 0x26 0x66
     , lightGrey = rgb255 0xE0 0xE0 0xE0
     , grey = rgb255 0x8D 0x8D 0x8D
     , googleLogin = rgb255 0x5F 0x63 0x68
