@@ -12,7 +12,7 @@ import Element.Background as Background
 import Element.Border as Border
 import Element.Events exposing (onClick)
 import Element.Font as Font
-import Element.Input as Input exposing (OptionState(..), button)
+import Element.Input as Input exposing (OptionState(..), Thumb, button)
 import FeatherIcons as Icon exposing (Icon, key)
 import Html exposing (Html, td, th, tr)
 import Html.Attributes exposing (hidden, style, type_, value)
@@ -383,8 +383,8 @@ type Msg
     | NewTaskUpdatePeriod String
     | NewTaskSetDatePicker DatePicker.Msg
     | EditTaskPeriod String
-    | EditSeasonStart String
-    | EditSeasonDuration String
+    | EditSeasonStart Float
+    | EditSeasonEnd Float
     | EditTaskDisableTag String
     | EditTaskEnableTag String
     | EditTaskTitle String
@@ -887,10 +887,10 @@ update msg model =
                 Nothing ->
                     ( model, Cmd.none )
 
-        EditSeasonStart seasonStartString ->
+        EditSeasonStart seasonStartFloat ->
             let
                 seasonStart =
-                    Maybe.withDefault 10 (String.toInt seasonStartString)
+                    floor seasonStartFloat
             in
             case model.editedTask of
                 Just task ->
@@ -898,12 +898,12 @@ update msg model =
                         AllYear ->
                             ( model, Cmd.none )
 
-                        Seasonal _ seasonDuration ->
+                        Seasonal _ seasonEnd ->
                             ( { model
                                 | editedTask =
                                     Just
                                         { task
-                                            | taskType = Seasonal seasonStart seasonDuration
+                                            | taskType = Seasonal seasonStart seasonEnd
                                         }
                               }
                             , Cmd.none
@@ -912,10 +912,10 @@ update msg model =
                 Nothing ->
                     ( model, Cmd.none )
 
-        EditSeasonDuration seasonDurationString ->
+        EditSeasonEnd seasonEndFloat ->
             let
-                seasonDuration =
-                    Maybe.withDefault 10 (String.toInt seasonDurationString)
+                seasonEnd =
+                    floor seasonEndFloat
             in
             case model.editedTask of
                 Just task ->
@@ -928,7 +928,7 @@ update msg model =
                                 | editedTask =
                                     Just
                                         { task
-                                            | taskType = Seasonal seasonStart seasonDuration
+                                            | taskType = Seasonal seasonStart seasonEnd
                                         }
                               }
                             , Cmd.none
@@ -1719,6 +1719,31 @@ viewTask model editingNotes =
 
         Just task ->
             let
+                buildSeasonalSliderInput inputVal msg label =
+                    Input.slider
+                        [ Element.behindContent
+                            (Element.el
+                                [ Element.width Element.fill
+                                , Element.height (Element.px 2)
+                                , Element.centerY
+                                , Background.color color.lightGrey
+                                , Border.rounded 2
+                                ]
+                                Element.none
+                            )
+                        ]
+                        { label =
+                            Input.labelAbove
+                                [ Font.semiBold ]
+                                (text <| label)
+                        , onChange = msg
+                        , min = 2
+                        , max = 360
+                        , value = toFloat inputVal
+                        , step = Just 1
+                        , thumb = Input.defaultThumb
+                        }
+
                 taskTypeInput =
                     case task.taskType of
                         AllYear ->
@@ -1733,25 +1758,27 @@ viewTask model editingNotes =
                                 , placeholder = Nothing
                                 }
 
-                        Seasonal seasonStart seasonDuration ->
+                        Seasonal seasonStart seasonEnd ->
                             let
                                 seasonalData =
                                     getSeasonalData
                                         model.currentDate
                                         seasonStart
-                                        seasonDuration
+                                        seasonEnd
 
-                                ( seasonStartMessage, seasonDurationMessage ) =
+                                seasonMessage =
                                     case seasonalData of
                                         CurrentSeason start end ->
-                                            ( "This season started on " ++ Date.toIsoString start
-                                            , "This season ends on " ++ Date.toIsoString end
-                                            )
+                                            "This season started on "
+                                                ++ Date.toIsoString start
+                                                ++ " and ends on "
+                                                ++ Date.toIsoString end
 
                                         NextSeason start end ->
-                                            ( "Next season starts on " ++ Date.toIsoString start
-                                            , "Next season ends on " ++ Date.toIsoString end
-                                            )
+                                            "This season starts on "
+                                                ++ Date.toIsoString start
+                                                ++ " and ends on "
+                                                ++ Date.toIsoString end
                             in
                             column []
                                 [ Input.text []
@@ -1764,24 +1791,15 @@ viewTask model editingNotes =
                                     , text = String.fromInt task.period
                                     , placeholder = Nothing
                                     }
-                                , Input.text []
-                                    { label =
-                                        Input.labelAbove
-                                            [ Font.semiBold ]
-                                            (text <| "Ordinal Season Start (" ++ seasonStartMessage ++ ")")
-                                    , onChange = EditSeasonStart
-                                    , text = String.fromInt seasonStart
-                                    , placeholder = Nothing
-                                    }
-                                , Input.text []
-                                    { label =
-                                        Input.labelAbove
-                                            [ Font.semiBold ]
-                                            (text <| "Season Duration in Days (" ++ seasonDurationMessage ++ ")")
-                                    , onChange = EditSeasonDuration
-                                    , text = String.fromInt seasonDuration
-                                    , placeholder = Nothing
-                                    }
+                                , buildSeasonalSliderInput
+                                    seasonStart
+                                    EditSeasonStart
+                                    "Season Start Date"
+                                , buildSeasonalSliderInput
+                                    seasonEnd
+                                    EditSeasonEnd
+                                    "Season End Date"
+                                , el [] (text <| seasonMessage)
                                 ]
 
                 historicalCadenceMsg =
