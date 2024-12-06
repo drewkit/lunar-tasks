@@ -37,13 +37,13 @@ type alias SeasonStart =
     Int
 
 
-type alias SeasonDuration =
+type alias SeasonEnd =
     Int
 
 
 type AllYearOrSeasonal
     = AllYear
-    | Seasonal SeasonStart SeasonDuration
+    | Seasonal SeasonStart SeasonEnd
 
 
 type AllYearOrSeasonalOption
@@ -159,8 +159,8 @@ getDaysPastDue currentDate task =
     let
         lastCompletedAt =
             case task.taskType of
-                Seasonal seasonStart seasonDuration ->
-                    case getSeasonalData currentDate seasonStart seasonDuration of
+                Seasonal seasonStart seasonEnd ->
+                    case getSeasonalData currentDate seasonStart seasonEnd of
                         NextSeason seasonStartDate _ ->
                             seasonStartDate
 
@@ -192,41 +192,68 @@ type SeasonalData
     | NextSeason Date.Date Date.Date
 
 
-getSeasonalData : Date.Date -> SeasonStart -> SeasonDuration -> SeasonalData
-getSeasonalData currentDate seasonStart seasonDuration =
+getSeasonalData : Date.Date -> SeasonStart -> SeasonEnd -> SeasonalData
+getSeasonalData currentDate seasonStart seasonEnd =
     let
         currentYear =
             Date.year currentDate
 
-        aSeasonStartDate =
-            Date.fromOrdinalDate (currentYear - 1) seasonStart
-
-        aSeasonEndDate =
-            Date.add Date.Days seasonDuration aSeasonStartDate
-
-        bSeasonStartDate =
+        startDateInThisYear =
             Date.fromOrdinalDate currentYear seasonStart
 
-        bSeasonEndDate =
-            Date.add Date.Days seasonDuration bSeasonStartDate
+        startDateInNextYear =
+            Date.add Date.Years 1 startDateInThisYear
 
-        cSeasonStartDate =
-            Date.fromOrdinalDate (currentYear + 1) seasonStart
+        startDateInLastYear =
+            Date.add Date.Years -1 startDateInThisYear
 
-        cSeasonEndDate =
-            Date.add Date.Days seasonDuration cSeasonStartDate
+        endDateInThisYear =
+            Date.fromOrdinalDate currentYear seasonEnd
+
+        endDateInNextYear =
+            Date.add Date.Years 1 endDateInThisYear
     in
-    if Date.isBetween aSeasonStartDate aSeasonEndDate currentDate then
-        CurrentSeason aSeasonStartDate aSeasonEndDate
+    case Date.compare startDateInThisYear endDateInThisYear of
+        GT ->
+            if
+                Date.isBetween
+                    startDateInLastYear
+                    endDateInThisYear
+                    currentDate
+            then
+                CurrentSeason startDateInLastYear endDateInThisYear
 
-    else if Date.isBetween bSeasonStartDate bSeasonEndDate currentDate then
-        CurrentSeason bSeasonStartDate bSeasonEndDate
+            else if
+                Date.isBetween
+                    startDateInThisYear
+                    endDateInNextYear
+                    currentDate
+            then
+                CurrentSeason startDateInThisYear endDateInNextYear
 
-    else if Date.isBetween aSeasonEndDate bSeasonStartDate currentDate then
-        NextSeason bSeasonStartDate bSeasonEndDate
+            else
+                NextSeason startDateInThisYear endDateInNextYear
 
-    else
-        NextSeason cSeasonStartDate cSeasonEndDate
+        _ ->
+            if
+                Date.isBetween
+                    startDateInThisYear
+                    endDateInThisYear
+                    currentDate
+            then
+                CurrentSeason startDateInThisYear endDateInThisYear
+
+            else if
+                Date.isBetween
+                    (Date.fromOrdinalDate currentYear 0)
+                    startDateInThisYear
+                    currentDate
+            then
+                NextSeason startDateInThisYear endDateInThisYear
+
+            else
+                NextSeason startDateInNextYear
+                    endDateInNextYear
 
 
 pastDue : Date.Date -> LunarTask -> Bool
@@ -317,10 +344,10 @@ lunarTaskEncoder task =
                 AllYear ->
                     Encode.null
 
-                Seasonal seasonStart seasonDuration ->
+                Seasonal seasonStart seasonEnd ->
                     Encode.object
                         [ ( "seasonStart", Encode.int seasonStart )
-                        , ( "seasonDuration", Encode.int seasonDuration )
+                        , ( "seasonEnd", Encode.int seasonEnd )
                         ]
     in
     Encode.object
@@ -358,7 +385,24 @@ allYearOrSeasonalDecoder =
 
 seasonalDecoder : Decoder AllYearOrSeasonal
 seasonalDecoder =
-    map2 Seasonal
+    oneOf
+        [ map2 Seasonal
+            (field "seasonStart" int)
+            (field "seasonEnd" int)
+        , seasonalDecoderWithDurationField
+        ]
+
+
+seasonalDecoderWithDurationField : Decoder AllYearOrSeasonal
+seasonalDecoderWithDurationField =
+    map2
+        (\start duration ->
+            let
+                end =
+                    modBy 365 (start + duration)
+            in
+            Seasonal start end
+        )
         (field "seasonStart" int)
         (field "seasonDuration" int)
 

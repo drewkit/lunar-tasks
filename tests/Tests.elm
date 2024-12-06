@@ -3,7 +3,7 @@ module Tests exposing (..)
 import Date
 import Expect
 import ListSettings exposing (..)
-import LunarTask exposing (LunarTask, genTaskWithOptions, getHistoricalCadence, getLastCompletedAt, markTaskCompleted, pastDue)
+import LunarTask exposing (LunarTask, SeasonalData(..), genTaskWithOptions, getHistoricalCadence, getLastCompletedAt, getSeasonalData, markTaskCompleted, pastDue)
 import Main exposing (..)
 import Test exposing (..)
 import Time
@@ -40,9 +40,78 @@ suite =
 
         ( testModel, _ ) =
             initWithMaybeNavKey ( 1711211815576, True ) url Nothing
+
+        winterOrdinal =
+            360
+
+        summerOrdinalEnd =
+            winterOrdinal
+
+        summerOrdinal =
+            190
+
+        fallOrdinal =
+            280
+
+        springOrdinal =
+            100
+
+        winterMonthsOrdinalStart =
+            fallOrdinal
+
+        winterMonthsOrdinalEnd =
+            springOrdinal
+
+        summerMonthsOrdinalStart =
+            springOrdinal
+
+        summerMonthsOrdinalEnd =
+            fallOrdinal
     in
     describe "Lunar Tasks"
-        [ describe "query params"
+        [ describe "getSeasonalData"
+            [ describe "currently summer time of year"
+                [ test "summer task shows as in season" <|
+                    \_ ->
+                        let
+                            currentDate =
+                                Date.fromOrdinalDate 2024 (fallOrdinal - 20)
+
+                            currentSeasonStartDate =
+                                Date.fromOrdinalDate 2024 summerMonthsOrdinalStart
+
+                            currentSeasonEndDate =
+                                Date.fromOrdinalDate 2024 summerMonthsOrdinalEnd
+                        in
+                        Expect.equal (CurrentSeason currentSeasonStartDate currentSeasonEndDate)
+                            (getSeasonalData
+                                currentDate
+                                summerMonthsOrdinalStart
+                                summerMonthsOrdinalEnd
+                            )
+                ]
+            , describe "currently winter time of year"
+                [ test "summer task shows as not in season" <|
+                    \_ ->
+                        let
+                            currentDate =
+                                Date.fromOrdinalDate 2024 (fallOrdinal + 20)
+
+                            nextSeasonStartDate =
+                                Date.fromOrdinalDate 2025 summerMonthsOrdinalStart
+
+                            nextSeasonEndDate =
+                                Date.fromOrdinalDate 2025 summerMonthsOrdinalEnd
+                        in
+                        Expect.equal (NextSeason nextSeasonStartDate nextSeasonEndDate)
+                            (getSeasonalData
+                                currentDate
+                                summerMonthsOrdinalStart
+                                summerMonthsOrdinalEnd
+                            )
+                ]
+            ]
+        , describe "query params"
             [ describe "on initialization with loaded query params"
                 [ test "'mow lawn' in text search" <|
                     \_ ->
