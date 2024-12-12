@@ -944,6 +944,7 @@ update msg model =
                         Just task ->
                             ( { model
                                 | editedTask = Just { task | bitTags = BitFlags.enableFlag model.tagSettings tag task.bitTags }
+                                , tagSearchBoxText = ""
                               }
                             , Cmd.none
                             )
@@ -963,7 +964,6 @@ update msg model =
                 SearchBox.SearchBoxChanged subMsg ->
                     ( { model
                         | tagSearchBox = SearchBox.update subMsg model.tagSearchBox
-                        , tagSearchBoxText = ""
                       }
                     , Cmd.none
                     )
