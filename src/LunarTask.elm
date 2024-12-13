@@ -202,16 +202,16 @@ getSeasonalData currentDate seasonStart seasonEnd =
             Date.fromOrdinalDate currentYear seasonStart
 
         startDateInNextYear =
-            Date.add Date.Years 1 startDateInThisYear
+            Date.fromOrdinalDate (currentYear + 1) seasonStart
 
         startDateInLastYear =
-            Date.add Date.Years -1 startDateInThisYear
+            Date.fromOrdinalDate (currentYear - 1) seasonStart
 
         endDateInThisYear =
             Date.fromOrdinalDate currentYear seasonEnd
 
         endDateInNextYear =
-            Date.add Date.Years 1 endDateInThisYear
+            Date.fromOrdinalDate (currentYear + 1) seasonEnd
     in
     case Date.compare startDateInThisYear endDateInThisYear of
         GT ->
