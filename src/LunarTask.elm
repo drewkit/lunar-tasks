@@ -70,6 +70,7 @@ type alias LunarTask =
     , bitTags : Int
     , completionEntries : List Date.Date
     , taskType : AllYearOrSeasonal
+    , customPastDueDate : Maybe Date.Date
     }
 
 
@@ -436,7 +437,12 @@ entryInfoToDate info =
 -- Mocked Data
 
 
-genTaskWithOptions : { entries : List Date.Date, period : Int } -> LunarTask
+genTaskWithOptions :
+    { entries : List Date.Date
+    , period : Int
+    , customPastDueDate : Maybe Date.Date
+    }
+    -> LunarTask
 genTaskWithOptions opts =
     { taskOwner = "1234567"
     , title = "task"
@@ -446,6 +452,7 @@ genTaskWithOptions opts =
     , period = opts.period
     , completionEntries = opts.entries
     , taskType = AllYear
+    , customPastDueDate = opts.customPastDueDate
     }
 
 

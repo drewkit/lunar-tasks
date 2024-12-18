@@ -69,7 +69,34 @@ suite =
             fallOrdinal
     in
     describe "Lunar Tasks"
-        [ describe "getSeasonalData"
+        [ describe "custom past due dates"
+            [ test "overrides tasks calculated past due date" <|
+                \_ ->
+                    let
+                        currentDate =
+                            Date.fromOrdinalDate 2024 fallOrdinal
+
+                        lastCompletedAt =
+                            Date.fromOrdinalDate 2024 springOrdinal
+
+                        customPastDueDate =
+                            Date.add Date.Days 30 currentDate
+
+                        notRecentlyCompletedButWithCustomPastDueDateInFuture =
+                            genTaskWithOptions
+                                { entries = [ lastCompletedAt ]
+                                , period = 5
+                                , customPastDueDate = Just customPastDueDate
+                                }
+                    in
+                    Expect.equal
+                        (LunarTask.pastDue
+                            currentDate
+                            notRecentlyCompletedButWithCustomPastDueDateInFuture
+                        )
+                        False
+            ]
+        , describe "getSeasonalData"
             [ describe "currently summer time of year"
                 [ test "summer task shows as in season" <|
                     \_ ->
@@ -169,6 +196,7 @@ suite =
                         LunarTask.genTaskWithOptions
                             { period = 1
                             , entries = [ Date.fromPosix Time.utc prevTime ]
+                            , customPastDueDate = Nothing
                             }
 
                     ( dayLaterModel, _ ) =
@@ -184,7 +212,7 @@ suite =
                 \_ ->
                     let
                         task =
-                            genTaskWithOptions { period = 10, entries = [] }
+                            genTaskWithOptions { period = 10, entries = [], customPastDueDate = Nothing }
 
                         fourEntries =
                             genEntries 1711211815576 12.2 4
@@ -197,7 +225,7 @@ suite =
                 \_ ->
                     let
                         task =
-                            genTaskWithOptions { period = 10, entries = [] }
+                            genTaskWithOptions { period = 10, entries = [], customPastDueDate = Nothing }
 
                         overFiveEntries =
                             genEntries 1711211815576 15 12
