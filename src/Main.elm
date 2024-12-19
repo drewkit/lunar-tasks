@@ -387,6 +387,8 @@ type Msg
     | EditSeasonEnd Float
     | EditTaskDisableTag String
     | EditTaskEnableTag String
+    | EditTaskRemoveManualPastDueDate
+    | EditTaskSetManualPastDueDate DatePicker.Msg
     | EditTaskTitle String
     | EditTaskNotes String
     | EditTaskRemoveCompletionEntry Date.Date
@@ -708,6 +710,7 @@ update msg model =
                             , bitTags = 0
                             , taskOwner = "alksdjflasd"
                             , taskType = AllYear
+                            , manualPastDueDate = Nothing
                             }
 
                         originalTask =
@@ -731,6 +734,30 @@ update msg model =
 
                     else
                         ( { model | editedTask = Nothing, view = LoadedTasksView MainTasksView }, Cmd.none )
+
+        EditTaskRemoveManualPastDueDate ->
+            case model.editedTask of
+                Just task ->
+                    ( { model
+                        | editedTask = Just { task | manualPastDueDate = Nothing }
+                      }
+                    , Cmd.none
+                    )
+
+                Nothing ->
+                    ( model, Cmd.none )
+
+        EditTaskSetManualPastDueDate datePickerMsg ->
+            case model.editedTask of
+                Just task ->
+                    ( { model
+                        | editedTask = Just { task | manualPastDueDate = Nothing }
+                      }
+                    , Cmd.none
+                    )
+
+                Nothing ->
+                    ( model, Cmd.none )
 
         EditTaskType taskTypeOption ->
             case model.editedTask of
