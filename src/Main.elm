@@ -14,7 +14,7 @@ import Element.Events exposing (onClick)
 import Element.Font as Font
 import Element.Input as Input exposing (OptionState(..), Thumb, button)
 import FeatherIcons as Icon exposing (Icon, key)
-import Html exposing (Html, td, th, tr)
+import Html exposing (Html, hr, td, th, tr)
 import Html.Attributes exposing (hidden, style, type_, value)
 import Html.Events exposing (onBlur)
 import Http
@@ -1903,21 +1903,21 @@ viewTask model editingNotes =
                 , taskTypeInput
                 , case getUnexpiredManualPastDueDate task.manualPastDueDate (getLastCompletedAt task) of
                     Just date ->
-                        column []
-                            [ el [] (text <| "Task will be marked as past due on " ++ Date.toIsoString date)
-                            , el
-                                [ onClick EditTaskRemoveManualPastDueDate
-                                , htmlAttribute <| Html.Attributes.style "cursor" "pointer"
-                                ]
-                                (text "x (clear manual date)")
+                        row []
+                            [ el [ Font.bold ] (text <| "Task is manually set to be past due on " ++ Date.toIsoString date)
+                            , text " -- "
+                            , button []
+                                { onPress = Just EditTaskRemoveManualPastDueDate
+                                , label = Icon.trash2 |> Icon.toHtml [] |> Element.html
+                                }
                             ]
 
                     Nothing ->
                         column []
-                            [ el [ Font.bold ] (text "Override task to be past due on:")
+                            [ el [ Font.bold ] (text "Ignore settings and make past due on")
                             , el [ Border.width 1, paddingXY 10 10, Border.color color.lightGrey ] <|
                                 (DatePicker.view Nothing
-                                    { datePickerSettings | placeholder = "" }
+                                    { datePickerSettings | placeholder = "Manual past due date" }
                                     model.datePickerForManualPastDue
                                     |> Html.map EditTaskSetManualPastDueDate
                                     |> Element.html
