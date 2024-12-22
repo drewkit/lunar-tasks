@@ -28,7 +28,8 @@ module LunarTask exposing
 import Date exposing (Date, Interval(..), Unit(..))
 import Html exposing (th)
 import Http exposing (task)
-import Json.Decode as Decode exposing (Decoder, field, int, map2, map7, map8, oneOf, string)
+import Json.Decode as Decode exposing (Decoder, field, int, map2, oneOf, string)
+import Json.Decode.Extra exposing (andMap)
 import Json.Encode as Encode
 import List exposing (length)
 
@@ -70,6 +71,7 @@ type alias LunarTask =
     , bitTags : Int
     , completionEntries : List Date.Date
     , taskType : AllYearOrSeasonal
+    , manualPastDueDate : Maybe Date.Date
     }
 
 
@@ -180,11 +182,26 @@ getDaysPastDue currentDate task =
 
         dateDiff =
             Date.diff Days lastCompletedAt currentDate
+
+        manualPastDueDate =
+            Maybe.withDefault (Date.fromOrdinalDate 1990 1)
+                task.manualPastDueDate
+
+        manualPastDueDateDiff =
+            Date.diff Days manualPastDueDate currentDate
     in
-    [ dateDiff - task.period ]
-        |> (::) 0
-        |> List.maximum
-        |> Maybe.withDefault 0
+    case Date.compare manualPastDueDate lastCompletedAt of
+        GT ->
+            [ manualPastDueDateDiff ]
+                |> (::) 0
+                |> List.maximum
+                |> Maybe.withDefault 0
+
+        _ ->
+            [ dateDiff - task.period ]
+                |> (::) 0
+                |> List.maximum
+                |> Maybe.withDefault 0
 
 
 type SeasonalData
@@ -349,6 +366,14 @@ lunarTaskEncoder task =
                         [ ( "seasonStart", Encode.int seasonStart )
                         , ( "seasonEnd", Encode.int seasonEnd )
                         ]
+
+        manualPastDueDateToObject =
+            case task.manualPastDueDate of
+                Nothing ->
+                    Encode.null
+
+                Just date ->
+                    Encode.object <| completionEntryToObject date
     in
     Encode.object
         [ ( "taskOwner", Encode.string task.taskOwner )
@@ -359,20 +384,22 @@ lunarTaskEncoder task =
         , ( "bitTags", Encode.int task.bitTags )
         , ( "completionEntries", Encode.list Encode.object (List.map completionEntryToObject task.completionEntries) )
         , ( "type", allYearOrSeasonalToObject )
+        , ( "manualPastDueDate", manualPastDueDateToObject )
         ]
 
 
 lunarTaskDecoder : Decoder LunarTask
 lunarTaskDecoder =
-    map8 LunarTask
-        (field "taskOwner" string)
-        (field "title" string)
-        (field "notes" string)
-        (field "id" string)
-        (field "period" int)
-        (field "bitTags" int)
-        (field "completionEntries" (Decode.list entryDecoder))
-        (field "type" allYearOrSeasonalDecoder)
+    Decode.succeed LunarTask
+        |> andMap (field "taskOwner" string)
+        |> andMap (field "title" string)
+        |> andMap (field "notes" string)
+        |> andMap (field "id" string)
+        |> andMap (field "period" int)
+        |> andMap (field "bitTags" int)
+        |> andMap (field "completionEntries" (Decode.list entryDecoder))
+        |> andMap (field "type" allYearOrSeasonalDecoder)
+        |> andMap (field "manualPastDueDate" (Decode.maybe entryDecoder))
 
 
 allYearOrSeasonalDecoder : Decoder AllYearOrSeasonal
@@ -436,7 +463,12 @@ entryInfoToDate info =
 -- Mocked Data
 
 
-genTaskWithOptions : { entries : List Date.Date, period : Int } -> LunarTask
+genTaskWithOptions :
+    { entries : List Date.Date
+    , period : Int
+    , manualPastDueDate : Maybe Date.Date
+    }
+    -> LunarTask
 genTaskWithOptions opts =
     { taskOwner = "1234567"
     , title = "task"
@@ -446,6 +478,7 @@ genTaskWithOptions opts =
     , period = opts.period
     , completionEntries = opts.entries
     , taskType = AllYear
+    , manualPastDueDate = opts.manualPastDueDate
     }
 
 
@@ -469,4 +502,5 @@ lunarTaskWithOneHundredCompletionEntries =
     , period = 20
     , completionEntries = completionEntries
     , taskType = AllYear
+    , manualPastDueDate = Nothing
     }

@@ -69,7 +69,93 @@ suite =
             fallOrdinal
     in
     describe "Lunar Tasks"
-        [ describe "getSeasonalData"
+        [ describe "when the manual past due date is set"
+            [ test "the past due state of task can be pushed back to a later date" <|
+                \_ ->
+                    let
+                        taskPeriod =
+                            5
+
+                        currentDate =
+                            Date.fromOrdinalDate 2024 fallOrdinal
+
+                        lastCompletedAt =
+                            Date.add Date.Days (taskPeriod * -3) currentDate
+
+                        manualPastDueDate =
+                            Date.add Date.Days (taskPeriod * 3) currentDate
+
+                        notRecentlyCompletedButWithManualPastDueDateInFuture =
+                            genTaskWithOptions
+                                { entries = [ lastCompletedAt ]
+                                , period = taskPeriod
+                                , manualPastDueDate = Just manualPastDueDate
+                                }
+                    in
+                    Expect.equal
+                        (LunarTask.pastDue
+                            currentDate
+                            notRecentlyCompletedButWithManualPastDueDateInFuture
+                        )
+                        False
+            , test "but only if the date is more recent than the last completion entry" <|
+                \_ ->
+                    let
+                        currentDate =
+                            Date.fromOrdinalDate 2024 fallOrdinal
+
+                        taskPeriod =
+                            5
+
+                        lastCompletedAt =
+                            Date.add Date.Days (floor (taskPeriod * -0.5)) currentDate
+
+                        manualPastDueDate =
+                            Date.add Date.Days (taskPeriod * -3) currentDate
+
+                        stillNotPastDueTaskWithOutdatedManualPastDueDate =
+                            genTaskWithOptions
+                                { entries = [ lastCompletedAt ]
+                                , period = taskPeriod
+                                , manualPastDueDate = Just manualPastDueDate
+                                }
+                    in
+                    Expect.equal
+                        (LunarTask.pastDue
+                            currentDate
+                            stillNotPastDueTaskWithOutdatedManualPastDueDate
+                        )
+                        False
+            , test "the past due state of task can also be brought forward to an earlier date" <|
+                \_ ->
+                    let
+                        taskPeriod =
+                            300
+
+                        currentDate =
+                            Date.fromOrdinalDate 2024 fallOrdinal
+
+                        lastCompletedAt =
+                            Date.add Date.Days (floor (taskPeriod * -0.3)) currentDate
+
+                        manualPastDueDate =
+                            Date.add Date.Days (floor (taskPeriod * -0.2)) currentDate
+
+                        recentlyCompletedButPastDueAgainTask =
+                            genTaskWithOptions
+                                { entries = [ lastCompletedAt ]
+                                , period = taskPeriod
+                                , manualPastDueDate = Just manualPastDueDate
+                                }
+                    in
+                    Expect.equal
+                        (LunarTask.pastDue
+                            currentDate
+                            recentlyCompletedButPastDueAgainTask
+                        )
+                        True
+            ]
+        , describe "getSeasonalData"
             [ describe "currently summer time of year"
                 [ test "summer task shows as in season" <|
                     \_ ->
@@ -169,6 +255,7 @@ suite =
                         LunarTask.genTaskWithOptions
                             { period = 1
                             , entries = [ Date.fromPosix Time.utc prevTime ]
+                            , manualPastDueDate = Nothing
                             }
 
                     ( dayLaterModel, _ ) =
@@ -184,7 +271,7 @@ suite =
                 \_ ->
                     let
                         task =
-                            genTaskWithOptions { period = 10, entries = [] }
+                            genTaskWithOptions { period = 10, entries = [], manualPastDueDate = Nothing }
 
                         fourEntries =
                             genEntries 1711211815576 12.2 4
@@ -197,7 +284,7 @@ suite =
                 \_ ->
                     let
                         task =
-                            genTaskWithOptions { period = 10, entries = [] }
+                            genTaskWithOptions { period = 10, entries = [], manualPastDueDate = Nothing }
 
                         overFiveEntries =
                             genEntries 1711211815576 15 12

@@ -7,6 +7,7 @@
       "period": 25,
       "bitTags": 0,
       "type": "",
+      "manualPastDueDate": "",
       "completionEntries": [
         {
           "year": 2023,
@@ -30,6 +31,7 @@
       "period": 60,
       "bitTags": 1,
       "type": "",
+      "manualPastDueDate": "",
       "completionEntries": [
         {
           "year": 2023,
@@ -51,6 +53,7 @@
         "seasonStart": 34,
         "seasonDuration": 90
       },
+      "manualPastDueDate": "",
       "bitTags": 2,
       "completionEntries": [
         {
@@ -74,6 +77,7 @@
         "seasonStart": 150,
         "seasonDuration": 90
       },
+      "manualPastDueDate": {},
       "completionEntries": [
         {
           "year": 2023,
@@ -93,6 +97,7 @@
       "period": 30,
       "bitTags": 1,
       "type": "",
+      "manualPastDueDate": {},
       "completionEntries": [
         {
           "year": 2023,
@@ -108,6 +113,7 @@
       "period": 300,
       "bitTags": 1,
       "type": "",
+      "manualPastDueDate": {},
       "completionEntries": [
         {
           "year": 2022,
@@ -126,6 +132,10 @@
         "seasonStart": 130,
         "seasonDuration": 200
       },
+      "manualPastDueDate": {
+        "year": 2024,
+        "day": 300
+      },
       "completionEntries": [
         {
           "year": 2023,
@@ -141,6 +151,7 @@
       "period": 200,
       "bitTags": 1,
       "type": null,
+      "manualPastDueDate": null,
       "completionEntries": [
         {
           "year": 2023,
@@ -156,6 +167,7 @@
       "period": 200,
       "bitTags": 1,
       "type": {},
+      "manualPastDueDate": null,
       "completionEntries": [
         {
           "year": 2023,
@@ -174,6 +186,7 @@
         "seasonStart": 150,
         "seasonDuration": 100
       },
+      "manualPastDueDate": null,
       "completionEntries": [
         {
           "year": 2021,
@@ -189,6 +202,7 @@
       "period": 180,
       "bitTags": 1,
       "type": "",
+      "manualPastDueDate": null,
       "completionEntries": [
         {
           "year": 2023,
@@ -207,6 +221,7 @@
         "seasonStart": 150,
         "seasonDuration": 150
       },
+      "manualPastDueDate": null,
       "completionEntries": [
         {
           "year": 2023,
@@ -226,6 +241,7 @@
       "period": 150,
       "bitTags": 1,
       "type": "",
+      "manualPastDueDate": null,
       "completionEntries": [
         {
           "year": 2023,
@@ -241,6 +257,7 @@
       "period": 180,
       "bitTags": 1,
       "type": "",
+      "manualPastDueDate": null,
       "completionEntries": [
         {
           "year": 2023,
@@ -259,6 +276,7 @@
         "seasonStart": 85,
         "seasonDuration": 260
       },
+      "manualPastDueDate": null,
       "completionEntries": [
         {
           "year": 2023,
@@ -282,6 +300,7 @@
       "period": 15,
       "bitTags": 1,
       "type": "",
+      "manualPastDueDate": null,
       "completionEntries": [
         {
           "year": 2023,
@@ -301,6 +320,7 @@
       "period": 60,
       "bitTags": 1,
       "type": "",
+      "manualPastDueDate": null,
       "completionEntries": [
         {
           "year": 2023,
@@ -320,6 +340,7 @@
       "period": 365,
       "bitTags": 1,
       "type": "",
+      "manualPastDueDate": null,
       "completionEntries": [
         {
           "year": 2023,
@@ -335,6 +356,7 @@
       "period": 300,
       "bitTags": 1,
       "type": "",
+      "manualPastDueDate": null,
       "completionEntries": [
         {
           "year": 2023,
@@ -350,6 +372,7 @@
       "period": 200,
       "bitTags": 4,
       "type": "",
+      "manualPastDueDate": null,
       "completionEntries": [
         {
           "year": 2023,
@@ -365,6 +388,7 @@
       "period": 500,
       "bitTags": 2,
       "type": "",
+      "manualPastDueDate": null,
       "completionEntries": [
         {
           "year": 2021,
@@ -380,6 +404,7 @@
       "period": 40,
       "bitTags": 0,
       "type": "",
+      "manualPastDueDate": null,
       "completionEntries": [
         {
           "year": 2023,

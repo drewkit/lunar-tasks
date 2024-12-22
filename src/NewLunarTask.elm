@@ -101,6 +101,7 @@ newLunarTaskEncoder task =
                 , ( "id", Encode.string (String.fromInt demoData.demoId) )
                 , ( "bitTags", Encode.int 0 )
                 , ( "type", encodedTaskType )
+                , ( "manualPastDueDate", Encode.null )
                 ]
 
         Nothing ->

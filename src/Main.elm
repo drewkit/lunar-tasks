@@ -14,7 +14,7 @@ import Element.Events exposing (onClick)
 import Element.Font as Font
 import Element.Input as Input exposing (OptionState(..), Thumb, button)
 import FeatherIcons as Icon exposing (Icon, key)
-import Html exposing (Html, td, th, tr)
+import Html exposing (Html, hr, td, th, tr)
 import Html.Attributes exposing (hidden, style, type_, value)
 import Html.Events exposing (onBlur)
 import Http
@@ -112,6 +112,7 @@ type alias Model =
     , tagSettings : BitFlagSettings
     , demo : Maybe { demoId : Int }
     , datePicker : DatePicker.DatePicker
+    , datePickerForManualPastDue : DatePicker.DatePicker
     , tagNameInput : String
     , tagSearchBox : SearchBox.State
     , tagSearchBoxText : String
@@ -308,6 +309,9 @@ initWithMaybeNavKey ( currentTimeinMillis, validAuth ) url maybeKey =
         ( newDatePicker, datePickerCmd ) =
             DatePicker.init
 
+        ( newDatePickerForManualPastDue, datePickerCmdForManualPastDue ) =
+            DatePicker.init
+
         model : Model
         model =
             { maybeKey = maybeKey
@@ -322,6 +326,7 @@ initWithMaybeNavKey ( currentTimeinMillis, validAuth ) url maybeKey =
             , tagSettings = BitFlags.defaultSettings 25
             , searchTerm = Nothing
             , datePicker = newDatePicker
+            , datePickerForManualPastDue = newDatePickerForManualPastDue
             , view = loadingOrLoginView
             , newTaskTitle = ""
             , newTaskNotes = ""
@@ -348,6 +353,7 @@ initWithMaybeNavKey ( currentTimeinMillis, validAuth ) url maybeKey =
         , Time.now |> Task.perform ReceivedCurrentTime
         , Time.here |> Task.perform AdjustTimeZone
         , Cmd.map NewTaskSetDatePicker datePickerCmd
+        , Cmd.map EditTaskSetManualPastDueDate datePickerCmdForManualPastDue
         ]
     )
 
@@ -387,6 +393,8 @@ type Msg
     | EditSeasonEnd Float
     | EditTaskDisableTag String
     | EditTaskEnableTag String
+    | EditTaskRemoveManualPastDueDate
+    | EditTaskSetManualPastDueDate DatePicker.Msg
     | EditTaskTitle String
     | EditTaskNotes String
     | EditTaskRemoveCompletionEntry Date.Date
@@ -708,6 +716,7 @@ update msg model =
                             , bitTags = 0
                             , taskOwner = "alksdjflasd"
                             , taskType = AllYear
+                            , manualPastDueDate = Nothing
                             }
 
                         originalTask =
@@ -731,6 +740,48 @@ update msg model =
 
                     else
                         ( { model | editedTask = Nothing, view = LoadedTasksView MainTasksView }, Cmd.none )
+
+        EditTaskRemoveManualPastDueDate ->
+            case model.editedTask of
+                Just task ->
+                    ( { model
+                        | editedTask = Just { task | manualPastDueDate = Nothing }
+                      }
+                    , Cmd.none
+                    )
+
+                Nothing ->
+                    ( model, Cmd.none )
+
+        EditTaskSetManualPastDueDate datePickerMsg ->
+            let
+                ( updatedDatePicker, dateEvent ) =
+                    DatePicker.update datePickerSettings datePickerMsg model.datePickerForManualPastDue
+            in
+            case model.editedTask of
+                Just task ->
+                    case dateEvent of
+                        DatePicker.Picked pickedDate ->
+                            ( { model
+                                | editedTask = Just { task | manualPastDueDate = Just pickedDate }
+                                , datePickerForManualPastDue = updatedDatePicker
+                              }
+                            , Cmd.none
+                            )
+
+                        _ ->
+                            ( { model
+                                | datePickerForManualPastDue = updatedDatePicker
+                              }
+                            , Cmd.none
+                            )
+
+                Nothing ->
+                    ( { model
+                        | datePickerForManualPastDue = updatedDatePicker
+                      }
+                    , Cmd.none
+                    )
 
         EditTaskType taskTypeOption ->
             case model.editedTask of
@@ -774,10 +825,10 @@ update msg model =
                 Nothing ->
                     ( model, Cmd.none )
 
-        EditTaskAddCompletionEntry subMsg ->
+        EditTaskAddCompletionEntry datePickerMsg ->
             let
                 ( newDatePicker, dateEvent ) =
-                    DatePicker.update datePickerSettings subMsg model.datePicker
+                    DatePicker.update datePickerSettings datePickerMsg model.datePicker
 
                 date : Maybe Date.Date
                 date =
@@ -979,10 +1030,10 @@ update msg model =
             else
                 ( model, deleteTask encodedLunarTask )
 
-        NewTaskSetDatePicker subMsg ->
+        NewTaskSetDatePicker datePickerMsg ->
             let
                 ( newDatePicker, dateEvent ) =
-                    DatePicker.update datePickerSettings subMsg model.datePicker
+                    DatePicker.update datePickerSettings datePickerMsg model.datePicker
 
                 date : Date.Date
                 date =
@@ -1809,6 +1860,22 @@ viewTask model editingNotes =
 
                         Just historicalCadence ->
                             "This task is completed on average once every " ++ String.fromInt historicalCadence ++ " days"
+
+                getUnexpiredManualPastDueDate : Maybe Date.Date -> Date.Date -> Maybe Date.Date
+                getUnexpiredManualPastDueDate maybeManualPastDueDate lastCompletedAt =
+                    Maybe.andThen
+                        (\manualPastDueDate ->
+                            case Date.compare lastCompletedAt manualPastDueDate of
+                                GT ->
+                                    Nothing
+
+                                EQ ->
+                                    Nothing
+
+                                LT ->
+                                    Just manualPastDueDate
+                        )
+                        maybeManualPastDueDate
             in
             Element.column [ paddingXY 100 45, spacingXY 0 25 ]
                 [ Input.text []
@@ -1834,6 +1901,28 @@ viewTask model editingNotes =
                         ]
                     }
                 , taskTypeInput
+                , case getUnexpiredManualPastDueDate task.manualPastDueDate (getLastCompletedAt task) of
+                    Just date ->
+                        row []
+                            [ el [ Font.bold ] (text <| "Task is manually set to be past due on " ++ Date.toIsoString date)
+                            , text " -- "
+                            , button []
+                                { onPress = Just EditTaskRemoveManualPastDueDate
+                                , label = Icon.trash2 |> Icon.toHtml [] |> Element.html
+                                }
+                            ]
+
+                    Nothing ->
+                        column []
+                            [ el [ Font.bold ] (text "Ignore settings and make past due on")
+                            , el [ Border.width 1, paddingXY 10 10, Border.color color.lightGrey ] <|
+                                (DatePicker.view Nothing
+                                    { datePickerSettings | placeholder = "Manual past due date" }
+                                    model.datePickerForManualPastDue
+                                    |> Html.map EditTaskSetManualPastDueDate
+                                    |> Element.html
+                                )
+                            ]
                 , if editingNotes then
                     el [ Font.bold ] (text "Notes")
 
