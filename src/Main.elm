@@ -100,7 +100,7 @@ type alias Model =
     , sort : ListSort
     , tagsSelected : ( Int, Int )
     , searchTerm : Maybe String
-    , savedViews : ( SavedView, List SavedView )
+    , savedViews : List SavedView
     , view : ViewState
     , newTaskTitle : String
     , newTaskNotes : String
@@ -334,7 +334,7 @@ initWithMaybeNavKey ( currentTimeinMillis, validAuth ) url maybeKey =
 
             -- search term will be overridden on init with default saved view
             , searchTerm = Nothing
-            , savedViews = ( defaultSavedView, [] )
+            , savedViews = []
             , datePicker = newDatePicker
             , datePickerForManualPastDue = newDatePickerForManualPastDue
             , view = loadingOrLoginView
@@ -385,6 +385,10 @@ type Msg
     | Search String
     | ClearSearch
     | ClearBanner
+    | SavedViewRemove
+    | SavedViewRemoved Decode.Value
+    | SavedViewAdd
+    | SavedViewAdded Decode.Value
     | FilterReset
     | LocalStoreFetched Decode.Value
     | ToggleSortOrder
@@ -628,6 +632,33 @@ update msg model =
             ( model |> updateSearchTerm "", [ Task.attempt (\_ -> NoOp) (Dom.focus "search-term") ] )
                 |> maybeUpdateQueryParams
                 |> batchCmdList
+
+        SavedViewAdd ->
+            let
+                updatedSavedViews =
+                    currentView model :: model.savedViews
+            in
+            ( { model | savedViews = updatedSavedViews }, Cmd.none )
+
+        SavedViewAdded _ ->
+            ( model, Cmd.none )
+
+        SavedViewRemove ->
+            let
+                savedView =
+                    currentView model
+
+                updatedSavedViews =
+                    List.filter
+                        (\x ->
+                            x /= savedView
+                        )
+                        model.savedViews
+            in
+            ( { model | savedViews = updatedSavedViews }, Cmd.none )
+
+        SavedViewRemoved _ ->
+            ( model, Cmd.none )
 
         ClearBanner ->
             ( { model | banner = "" }, Cmd.none )
@@ -2203,6 +2234,24 @@ viewTaskDiscovery model =
                 , label = Input.labelHidden "search"
                 }
 
+        savedSearchBtn =
+            if not <| currentViewIsSavedView model then
+                button
+                    [ centerY
+                    ]
+                    { onPress = Just SavedViewAdd
+                    , label = Icon.star |> Icon.toHtml [] |> Element.html
+                    }
+
+            else
+                button
+                    [ centerY
+                    , Debug.todo "start working on a dropdown list for saved views"
+                    ]
+                    { onPress = Just SavedViewRemove
+                    , label = Icon.disc |> Icon.toHtml [] |> Element.html
+                    }
+
         clearSearchBtn =
             button
                 [ transparent (Maybe.withDefault "" model.searchTerm == "")
@@ -2214,22 +2263,14 @@ viewTaskDiscovery model =
 
         hideResetOption : Bool
         hideResetOption =
-            let
-                ( defaultSavedView, _ ) =
-                    model.savedViews
-            in
-            (model.filter == defaultSavedView.filter)
-                && (model.sort == defaultSavedView.sort)
-                && (model.searchTerm == defaultSavedView.searchTerm)
-                && Tuple.first defaultSavedView.tagsSelected
-                == Tuple.first model.tagsSelected
-                && Tuple.second defaultSavedView.tagsSelected
-                == Tuple.second model.tagsSelected
+            savedViewMatch
+                defaultSavedView
+                (currentView model)
 
         resetOption =
             button
                 [ transparent hideResetOption ]
-                { label = text "(x) reset to default view", onPress = Just FilterReset }
+                { label = text "(x) return to default view", onPress = Just FilterReset }
 
         getTagState : String -> TagToggleState
         getTagState tag =
@@ -2293,6 +2334,7 @@ viewTaskDiscovery model =
         , row [ Border.width 1, paddingXY 10 7 ]
             [ searchTermInput
             , clearSearchBtn
+            , savedSearchBtn
             ]
         , tagsRow
         , resetOption
