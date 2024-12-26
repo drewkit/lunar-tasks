@@ -16,6 +16,7 @@ type alias SavedView =
     , sort : ListSort
     , tagsSelected : ( Int, Int )
     , searchTerm : Maybe String
+    , title : Maybe String
     }
 
 
@@ -24,7 +25,8 @@ defaultSavedView =
     { filter = FilterPastDue
     , sort = NoSort DESC
     , tagsSelected = ( 0, 0 )
-    , searchTerm = Just "hi"
+    , searchTerm = Nothing
+    , title = Nothing
     }
 
 
@@ -38,13 +40,37 @@ setSavedView savedView listSettings =
     }
 
 
+savedViewMatch : SavedView -> SavedView -> Bool
+savedViewMatch a b =
+    a.filter
+        == b.filter
+        && a.sort
+        == b.sort
+        && a.tagsSelected
+        == b.tagsSelected
+        && a.searchTerm
+        == b.searchTerm
+
+
+currentView : ListSettings r -> SavedView
+currentView { filter, sort, tagsSelected, searchTerm } =
+    SavedView filter sort tagsSelected searchTerm Nothing
+
+
+currentViewIsSavedView : ListSettings r -> Bool
+currentViewIsSavedView ls =
+    List.any
+        (savedViewMatch <| currentView ls)
+        ls.savedViews
+
+
 type alias ListSettings r =
     { r
         | filter : ListFilter
         , sort : ListSort
         , tagsSelected : ( Int, Int )
         , searchTerm : Maybe String
-        , savedViews : ( SavedView, List SavedView )
+        , savedViews : List SavedView
         , tagSettings : BitFlags.BitFlagSettings
     }
 
@@ -76,15 +102,11 @@ updateListFilter listSettings filterSetting =
 
 resetFilter : ListSettings r -> ListSettings r
 resetFilter listSettings =
-    let
-        ( defaultView, _ ) =
-            listSettings.savedViews
-    in
     { listSettings
-        | filter = defaultView.filter
-        , sort = defaultView.sort
-        , tagsSelected = defaultView.tagsSelected
-        , searchTerm = defaultView.searchTerm
+        | filter = defaultSavedView.filter
+        , sort = defaultSavedView.sort
+        , tagsSelected = defaultSavedView.tagsSelected
+        , searchTerm = defaultSavedView.searchTerm
     }
 
 
