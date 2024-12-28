@@ -26,6 +26,11 @@ import ListSettings exposing (..)
 import LunarTask exposing (..)
 import Markdown.Renderer.ElmUi as Markdown
 import NewLunarTask exposing (..)
+import OUI.Button as Button
+import OUI.Material as Material
+import OUI.Material.Color as Color
+import OUI.Material.Theme as Theme
+import OUI.Text as Text
 import Process
 import SHA1
 import SearchBox
@@ -1340,69 +1345,44 @@ update msg model =
 -- VIEW
 
 
+theme =
+    Theme.defaultTheme
+
+
 loginlogoutButton : ViewState -> Element Msg
 loginlogoutButton viewType =
     let
-        buttonAttrs =
-            [ Background.color color.white
-            , Font.color color.googleLogin
-            , Font.size 15
-            , height (px 42)
-            , width (fill |> minimum 150 |> maximum 500)
-            , Font.center
-            , Border.width 1
-            , Border.color color.lightGrey
-            , Border.rounded 3
-            , Border.shadow
-                { offset = ( 0, 0.2 )
-                , size = 0.05
-                , blur = 0
-                , color = color.darkCharcoal
-                }
-            , Font.family
-                [ Font.typeface "Roboto"
-                , Font.sansSerif
-                ]
-            ]
-
         rowSpecs =
             [ alignRight, spacing 15 ]
 
         loginButton =
             row rowSpecs
-                [ button
-                    [ width (fill |> minimum 200)
-                    , paddingEach { top = 4, bottom = 4, left = 0, right = 4 }
-                    ]
-                    { label =
-                        row buttonAttrs
-                            [ image []
-                                { src = "/images/btn_google_light_normal_ios.svg"
-                                , description = "google login"
-                                }
-                            , text "Sign in with Google"
-                            ]
-                    , onPress = Just (LoginUser 0)
-                    }
-                , button
-                    buttonAttrs
-                    { label = text "Demo Mode"
-                    , onPress = Just (DemoLoginUser 0)
-                    }
+                [ Button.new "Sign in with Google"
+                    |> Button.onClick (LoginUser 0)
+                    |> Material.button theme []
+                , Button.new "Demo Mode"
+                    |> Button.onClick (DemoLoginUser 0)
+                    |> Material.button theme []
                 ]
 
         exportButton =
             case viewType of
                 LoadedTasksView MainTasksView ->
-                    button buttonAttrs { label = text "JSON export", onPress = Just (ViewChange (LoadedTasksView JsonExportView)) }
+                    Button.new "JSON export"
+                        |> Button.onClick (ViewChange (LoadedTasksView JsonExportView))
+                        |> Material.button theme []
 
                 _ ->
-                    button buttonAttrs { label = text "Return to Main", onPress = Just (ViewChange (LoadedTasksView MainTasksView)) }
+                    Button.new "Return to Main"
+                        |> Button.onClick (ViewChange (LoadedTasksView MainTasksView))
+                        |> Material.button theme []
 
         logoutButton =
             row rowSpecs
                 [ exportButton
-                , button buttonAttrs { label = text "Log Out", onPress = Just (LogOutUser 0) }
+                , Button.new "Log Out"
+                    |> Button.onClick (LogOutUser 0)
+                    |> Material.button theme []
                 ]
     in
     case viewType of
@@ -1466,13 +1446,8 @@ viewHeader model =
             , Background.color headerBackgroundColor
             ]
             [ row [ onClick ReturnToMain ]
-                [ el [ Font.color headerFontColor ] viewMoon
-                , el
-                    [ Font.size 55
-                    , paddingXY 15 0
-                    , Font.color headerFontColor
-                    ]
-                    (text "LunarTasks")
+                [ viewMoon
+                , Material.text theme (Text.displayMedium "LunarTasks")
                 ]
             , loginlogoutButton model.view
             ]
@@ -2280,17 +2255,16 @@ viewMain model =
 
 
 type alias Colors =
-    { blue : Color
-    , darkCharcoal : Color
-    , green : Color
-    , lightBlue : Color
-    , darkBlue : Color
-    , lightGrey : Color
-    , orange : Color
-    , red : Color
-    , white : Color
-    , grey : Color
-    , googleLogin : Color
+    { blue : Element.Color
+    , darkCharcoal : Element.Color
+    , green : Element.Color
+    , lightBlue : Element.Color
+    , lightGrey : Element.Color
+    , orange : Element.Color
+    , red : Element.Color
+    , white : Element.Color
+    , grey : Element.Color
+    , googleLogin : Element.Color
     }
 
 

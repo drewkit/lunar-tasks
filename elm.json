@@ -22,9 +22,11 @@
             "justinmimbs/date": "3.2.1",
             "mdgriffith/elm-ui": "1.1.8",
             "ohanhi/keyboard": "2.0.1",
+            "orus-io/elm-orus-ui": "1.0.1",
             "russelldavies/elm-ui-searchbox": "1.1.1"
         },
         "indirect": {
+            "avh4/elm-color": "1.0.0",
             "danfishgold/base64-bytes": "1.1.0",
             "dillonkearns/elm-markdown": "7.0.1",
             "elm/bytes": "1.0.8",
@@ -35,7 +37,10 @@
             "elm/virtual-dom": "1.0.3",
             "elm-community/result-extra": "2.4.0",
             "rtfeldman/elm-hex": "1.0.0",
-            "rtfeldman/elm-iso8601-date-strings": "1.1.4"
+            "rtfeldman/elm-iso8601-date-strings": "1.1.4",
+            "fredcy/elm-parseint": "2.0.1",
+            "noahzgordon/elm-color-extra": "1.0.2",
+            "orus-io/elm-spa": "3.0.1"
         }
     },
     "test-dependencies": {
