@@ -22,7 +22,7 @@ type alias SavedView =
 
 defaultSavedView : SavedView
 defaultSavedView =
-    { filter = FilterPastDue
+    { filter = FilterAll
     , sort = NoSort DESC
     , tagsSelected = ( 0, 0 )
     , searchTerm = Nothing
@@ -98,16 +98,6 @@ type ListSort
 updateListFilter : ListSettings r -> ListFilter -> ListSettings r
 updateListFilter listSettings filterSetting =
     { listSettings | filter = filterSetting }
-
-
-resetFilter : ListSettings r -> ListSettings r
-resetFilter listSettings =
-    { listSettings
-        | filter = defaultSavedView.filter
-        , sort = defaultSavedView.sort
-        , tagsSelected = defaultSavedView.tagsSelected
-        , searchTerm = defaultSavedView.searchTerm
-    }
 
 
 updateSort : ListSort -> ListSettings r -> ListSettings r

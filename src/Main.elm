@@ -691,7 +691,7 @@ update msg model =
             ( { model | banner = "" }, Cmd.none )
 
         FilterReset ->
-            ( model |> resetFilter, [] )
+            ( model |> setSavedView defaultSavedView, [] )
                 |> maybeUpdateQueryParams
                 |> batchCmdList
 
@@ -2204,8 +2204,13 @@ viewTaskDiscovery model =
 
         savedSearchBtn =
             if not <| currentViewIsSavedView model then
+                let
+                    currentViewisDefaultView =
+                        savedViewMatch defaultSavedView (currentView model)
+                in
                 button
                     [ centerY
+                    , transparent currentViewisDefaultView
                     ]
                     { onPress = Just SavedViewAdd
                     , label = Icon.star |> Icon.toHtml [] |> Element.html
@@ -2214,7 +2219,6 @@ viewTaskDiscovery model =
             else
                 button
                     [ centerY
-                    , Debug.todo "start working on a dropdown list for saved views"
                     ]
                     { onPress = Just SavedViewRemove
                     , label = Icon.disc |> Icon.toHtml [] |> Element.html
@@ -2238,7 +2242,7 @@ viewTaskDiscovery model =
         resetOption =
             button
                 [ transparent hideResetOption ]
-                { label = text "(x) return to default view", onPress = Just FilterReset }
+                { label = text "(x) reset all selections", onPress = Just FilterReset }
 
         getTagState : String -> TagToggleState
         getTagState tag =
@@ -2301,8 +2305,8 @@ viewTaskDiscovery model =
         , sortRow
         , row [ Border.width 1, paddingXY 10 7 ]
             [ searchTermInput
-            , clearSearchBtn
             , savedSearchBtn
+            , clearSearchBtn
             ]
         , tagsRow
         , resetOption
