@@ -52,6 +52,20 @@ savedViewMatch a b =
         == b.searchTerm
 
 
+findMatchingSavedView : SavedView -> List SavedView -> Maybe SavedView
+findMatchingSavedView currentSavedView savedViews =
+    case savedViews of
+        savedView :: remainingSavedViews ->
+            if savedViewMatch savedView currentSavedView then
+                Just savedView
+
+            else
+                findMatchingSavedView currentSavedView remainingSavedViews
+
+        [] ->
+            Nothing
+
+
 currentView : ListSettings r -> SavedView
 currentView { filter, sort, tagsSelected, searchTerm } =
     SavedView filter sort tagsSelected searchTerm Nothing
