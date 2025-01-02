@@ -7,6 +7,7 @@ import Browser.Events exposing (Visibility(..), onVisibilityChange)
 import Browser.Navigation as Nav
 import Date exposing (Date, Unit(..))
 import DatePicker exposing (defaultSettings)
+import Dropdown exposing (..)
 import Element exposing (..)
 import Element.Background as Background
 import Element.Border as Border
@@ -101,6 +102,8 @@ type alias Model =
     , tagsSelected : ( Int, Int )
     , searchTerm : Maybe String
     , savedViews : List SavedView
+    , savedViewDropdownState : Dropdown.State SavedView
+    , savedViewTitleInput : String
     , view : ViewState
     , newTaskTitle : String
     , newTaskNotes : String
@@ -128,9 +131,14 @@ type alias EditingNotes =
     Bool
 
 
+type MainTaskViewModes
+    = Normal
+    | EditSavedViewTitle
+
+
 type LoadedTasksViewState
     = JsonExportView
-    | MainTasksView
+    | MainTasksView MainTaskViewModes
     | EditTaskView EditingNotes
     | TagSettingsView (Maybe String)
 
@@ -263,6 +271,23 @@ datePickerSettings =
     }
 
 
+savedViewDropdownConfig : Dropdown.Config SavedView Msg Model
+savedViewDropdownConfig =
+    let
+        itemToTitle item =
+            Maybe.withDefault (Maybe.withDefault "SAVED VIEW" item.searchTerm) item.title
+                |> String.pad 20 ' '
+    in
+    Dropdown.basic
+        { itemsFromModel = \m -> m.savedViews
+        , selectionFromModel = \m -> findMatchingSavedView (currentView m) m.savedViews
+        , dropdownMsg = SavedViewDropdown
+        , onSelectMsg = SavedViewSelection
+        , itemToPrompt = \savedView -> el [] (text <| itemToTitle savedView)
+        , itemToElement = \_ _ savedView -> el [] (text <| itemToTitle savedView)
+        }
+
+
 
 -- INIT
 
@@ -335,6 +360,8 @@ initWithMaybeNavKey ( currentTimeinMillis, validAuth ) url maybeKey =
             -- search term will be overridden on init with default saved view
             , searchTerm = Nothing
             , savedViews = []
+            , savedViewDropdownState = Dropdown.init "saved-view-dropdown"
+            , savedViewTitleInput = ""
             , datePicker = newDatePicker
             , datePickerForManualPastDue = newDatePickerForManualPastDue
             , view = loadingOrLoginView
@@ -389,6 +416,11 @@ type Msg
     | SavedViewRemoved Decode.Value
     | SavedViewAdd
     | SavedViewAdded Decode.Value
+    | SavedViewDropdown (Dropdown.Msg SavedView)
+    | SavedViewSelection (Maybe SavedView)
+    | SavedViewEditTitle
+    | SavedViewUpdateTitleInput String
+    | SavedViewUpdateTitle
     | FilterReset
     | LocalStoreFetched Decode.Value
     | ToggleSortOrder
@@ -645,20 +677,81 @@ update msg model =
 
         SavedViewRemove ->
             let
-                savedView =
+                currentSavedView =
                     currentView model
 
                 updatedSavedViews =
                     List.filter
                         (\x ->
-                            x /= savedView
+                            x /= currentSavedView
                         )
                         model.savedViews
             in
-            ( { model | savedViews = updatedSavedViews }, Cmd.none )
+            ( { model | savedViews = updatedSavedViews }
+                |> setSavedView defaultSavedView
+            , Cmd.none
+            )
 
         SavedViewRemoved _ ->
             ( model, Cmd.none )
+
+        SavedViewDropdown subMsg ->
+            let
+                ( updatedSavedViewDropdown, cmd ) =
+                    Dropdown.update
+                        savedViewDropdownConfig
+                        subMsg
+                        model
+                        model.savedViewDropdownState
+            in
+            ( { model | savedViewDropdownState = updatedSavedViewDropdown }, cmd )
+
+        SavedViewSelection maybeSavedView ->
+            case maybeSavedView of
+                Nothing ->
+                    ( model, Cmd.none )
+
+                Just savedView ->
+                    ( model
+                        |> setSavedView savedView
+                    , Cmd.none
+                    )
+
+        SavedViewEditTitle ->
+            ( { model
+                | view =
+                    LoadedTasksView (MainTasksView EditSavedViewTitle)
+              }
+            , Cmd.none
+            )
+
+        SavedViewUpdateTitleInput title ->
+            ( { model | savedViewTitleInput = title }, Cmd.none )
+
+        SavedViewUpdateTitle ->
+            let
+                currentSavedView =
+                    currentView model
+
+                allButCurrentView =
+                    List.filter
+                        (\x -> not (savedViewMatch currentSavedView x))
+                        model.savedViews
+
+                newTitle =
+                    model.savedViewTitleInput
+            in
+            ( { model
+                | savedViewTitleInput = ""
+                , view = LoadedTasksView (MainTasksView Normal)
+                , savedViews =
+                    { currentSavedView
+                        | title = Just newTitle
+                    }
+                        :: allButCurrentView
+              }
+            , Cmd.none
+            )
 
         ClearBanner ->
             ( { model | banner = "" }, Cmd.none )
@@ -840,7 +933,7 @@ update msg model =
                     case Decode.decodeString (Decode.list lunarTaskDecoder) demoDataString of
                         Ok tasks ->
                             ( { model
-                                | view = LoadedTasksView MainTasksView
+                                | view = LoadedTasksView (MainTasksView Normal)
                                 , tasks = tasks
                               }
                             , Cmd.none
@@ -893,7 +986,7 @@ update msg model =
                         loadedTasksModel =
                             { model
                                 | tasks = tasks
-                                , view = LoadedTasksView MainTasksView
+                                , view = LoadedTasksView (MainTasksView Normal)
                             }
                     in
                     ( loadedTasksModel
@@ -971,7 +1064,7 @@ update msg model =
                 Ok localStore ->
                     if model.taskOwner == localStore.taskOwner then
                         ( { model
-                            | view = LoadedTasksView MainTasksView
+                            | view = LoadedTasksView (MainTasksView Normal)
                             , tasks = localStore.tasks
                             , tagSettings = localStore.bitFlags
                             , tagResourcesLoaded = True
@@ -1003,7 +1096,7 @@ update msg model =
                     ( model, Cmd.none )
 
                 LoadedTasksView _ ->
-                    ( { model | view = LoadedTasksView MainTasksView }, Cmd.none )
+                    ( { model | view = LoadedTasksView (MainTasksView Normal) }, Cmd.none )
 
         NoOp ->
             ( model, Cmd.none )
@@ -1107,7 +1200,7 @@ updateEditedTask editTaskMsg model =
                     ( { model | view = LoadedTasksView (EditTaskView False), editedTask = Just task }, Cmd.none )
 
         Cancel ->
-            ( { model | editedTask = Nothing, view = LoadedTasksView MainTasksView }, Cmd.none )
+            ( { model | editedTask = Nothing, view = LoadedTasksView (MainTasksView Normal) }, Cmd.none )
 
         Save ->
             case model.editedTask of
@@ -1137,7 +1230,7 @@ updateEditedTask editTaskMsg model =
                             update (TaskUpdated (lunarTaskEncoder editedTask))
                                 { model
                                     | editedTask = Nothing
-                                    , view = LoadedTasksView MainTasksView
+                                    , view = LoadedTasksView (MainTasksView Normal)
                                 }
 
                         else
@@ -1148,13 +1241,13 @@ updateEditedTask editTaskMsg model =
                             in
                             ( { model
                                 | editedTask = Nothing
-                                , view = LoadedTasksView MainTasksView
+                                , view = LoadedTasksView (MainTasksView Normal)
                               }
                             , updateTask (lunarTaskEncoder editedTask)
                             )
 
                     else
-                        ( { model | editedTask = Nothing, view = LoadedTasksView MainTasksView }, Cmd.none )
+                        ( { model | editedTask = Nothing, view = LoadedTasksView (MainTasksView Normal) }, Cmd.none )
 
         RemoveManualPastDueDate ->
             case model.editedTask of
@@ -1462,11 +1555,11 @@ loginlogoutButton viewType =
 
         exportButton =
             case viewType of
-                LoadedTasksView MainTasksView ->
+                LoadedTasksView (MainTasksView _) ->
                     button buttonAttrs { label = text "JSON export", onPress = Just (ViewChange (LoadedTasksView JsonExportView)) }
 
                 _ ->
-                    button buttonAttrs { label = text "Return to Main", onPress = Just (ViewChange (LoadedTasksView MainTasksView)) }
+                    button buttonAttrs { label = text "Return to Main", onPress = Just (ViewChange (LoadedTasksView (MainTasksView Normal))) }
 
         logoutButton =
             row rowSpecs
@@ -1572,7 +1665,7 @@ view model =
                 LoadingTasksFailureView ->
                     el [] (text "")
 
-                LoadedTasksView MainTasksView ->
+                LoadedTasksView (MainTasksView _) ->
                     viewMain model
 
                 LoadedTasksView (EditTaskView editingNotes) ->
@@ -2234,7 +2327,7 @@ viewTaskDiscovery model =
                 , label = Input.labelHidden "search"
                 }
 
-        savedSearchBtn =
+        saveViewBtn =
             if not <| currentViewIsSavedView model then
                 let
                     currentViewisDefaultView =
@@ -2249,12 +2342,20 @@ viewTaskDiscovery model =
                     }
 
             else
-                button
-                    [ centerY
+                row []
+                    [ button
+                        [ centerY
+                        ]
+                        { onPress = Just SavedViewEditTitle
+                        , label = Icon.edit |> Icon.toHtml [] |> Element.html
+                        }
+                    , button
+                        [ centerY
+                        ]
+                        { onPress = Just SavedViewRemove
+                        , label = Icon.trash2 |> Icon.toHtml [] |> Element.html
+                        }
                     ]
-                    { onPress = Just SavedViewRemove
-                    , label = Icon.disc |> Icon.toHtml [] |> Element.html
-                    }
 
         clearSearchBtn =
             button
@@ -2265,16 +2366,14 @@ viewTaskDiscovery model =
                 , label = Icon.x |> Icon.toHtml [] |> Element.html
                 }
 
+        savedViewDropdown =
+            Dropdown.view savedViewDropdownConfig model model.savedViewDropdownState
+
         hideResetOption : Bool
         hideResetOption =
             savedViewMatch
                 defaultSavedView
                 (currentView model)
-
-        resetOption =
-            button
-                [ transparent hideResetOption ]
-                { label = text "(x) reset all selections", onPress = Just FilterReset }
 
         getTagState : String -> TagToggleState
         getTagState tag =
@@ -2331,17 +2430,39 @@ viewTaskDiscovery model =
                         allTags
                         ++ [ tagSettingsBtn ]
                     )
+
+        savedViewsRow =
+            case model.view of
+                LoadedTasksView (MainTasksView EditSavedViewTitle) ->
+                    case findMatchingSavedView (currentView model) model.savedViews of
+                        Nothing ->
+                            el [] (text "woops")
+
+                        Just savedView ->
+                            Element.html <|
+                                Html.div []
+                                    [ Html.input
+                                        [ Html.Attributes.type_ "text"
+                                        , Html.Attributes.placeholder "Saved View Title"
+                                        , Html.Attributes.value model.savedViewTitleInput
+                                        , Html.Events.onInput SavedViewUpdateTitleInput
+                                        ]
+                                        []
+                                    , Icon.plusCircle |> Icon.toHtml [ Html.Events.onClick SavedViewUpdateTitle ]
+                                    ]
+
+                _ ->
+                    row [] [ row [ Border.width 1 ] [ savedViewDropdown ], saveViewBtn ]
     in
     column [ spacingXY 0 15 ]
         [ filterRow
         , sortRow
         , row [ Border.width 1, paddingXY 10 7 ]
             [ searchTermInput
-            , savedSearchBtn
             , clearSearchBtn
             ]
         , tagsRow
-        , resetOption
+        , savedViewsRow
         ]
 
 
