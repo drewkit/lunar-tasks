@@ -418,7 +418,7 @@ type Msg
     | SavedViewAdded Decode.Value
     | SavedViewDropdown (Dropdown.Msg SavedView)
     | SavedViewSelection (Maybe SavedView)
-    | SavedViewEditTitle
+    | SavedViewEditTitle String
     | SavedViewUpdateTitleInput String
     | SavedViewUpdateTitle
     | FilterReset
@@ -717,9 +717,10 @@ update msg model =
                     , Cmd.none
                     )
 
-        SavedViewEditTitle ->
+        SavedViewEditTitle previousTitle ->
             ( { model
-                | view =
+                | savedViewTitleInput = previousTitle
+                , view =
                     LoadedTasksView (MainTasksView EditSavedViewTitle)
               }
             , Cmd.none
@@ -2291,6 +2292,9 @@ radioOption label maybeSortOrder state =
 viewTaskDiscovery : Model -> Element Msg
 viewTaskDiscovery model =
     let
+        maybeSavedView =
+            findMatchingSavedView (currentView model) model.savedViews
+
         filterRow =
             Input.radioRow [ spacingXY 25 0, Font.semiBold ]
                 { onChange = SelectFilter
@@ -2342,11 +2346,20 @@ viewTaskDiscovery model =
                     }
 
             else
+                let
+                    savedViewTitle =
+                        case maybeSavedView of
+                            Nothing ->
+                                ""
+
+                            Just savedView ->
+                                Maybe.withDefault "" savedView.title
+                in
                 row []
                     [ button
                         [ centerY
                         ]
-                        { onPress = Just SavedViewEditTitle
+                        { onPress = Just (SavedViewEditTitle savedViewTitle)
                         , label = Icon.edit |> Icon.toHtml [] |> Element.html
                         }
                     , button
@@ -2368,12 +2381,6 @@ viewTaskDiscovery model =
 
         savedViewDropdown =
             Dropdown.view savedViewDropdownConfig model model.savedViewDropdownState
-
-        hideResetOption : Bool
-        hideResetOption =
-            savedViewMatch
-                defaultSavedView
-                (currentView model)
 
         getTagState : String -> TagToggleState
         getTagState tag =
@@ -2434,11 +2441,11 @@ viewTaskDiscovery model =
         savedViewsRow =
             case model.view of
                 LoadedTasksView (MainTasksView EditSavedViewTitle) ->
-                    case findMatchingSavedView (currentView model) model.savedViews of
+                    case maybeSavedView of
                         Nothing ->
                             el [] (text "woops")
 
-                        Just savedView ->
+                        Just _ ->
                             Element.html <|
                                 Html.div []
                                     [ Html.input
