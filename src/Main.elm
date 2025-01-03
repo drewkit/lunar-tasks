@@ -30,7 +30,7 @@ import NewLunarTask exposing (..)
 import Process
 import SHA1
 import SearchBox
-import Set exposing (Set)
+import Set
 import Task
 import Time exposing (utc)
 import Url exposing (Url)
