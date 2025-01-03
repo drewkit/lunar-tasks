@@ -3,7 +3,7 @@ module Tests exposing (..)
 import Date
 import Expect
 import ListSettings exposing (..)
-import LunarTask exposing (LunarTask, SeasonalData(..), genTaskWithOptions, getHistoricalCadence, getLastCompletedAt, getSeasonalData, markTaskCompleted, pastDue)
+import LunarTask exposing (SeasonalData(..), genTaskWithOptions, getHistoricalCadence, getLastCompletedAt, getSeasonalData, markTaskCompleted, pastDue)
 import Main exposing (..)
 import Test exposing (..)
 import Time
@@ -41,26 +41,11 @@ suite =
         ( testModel, _ ) =
             initWithMaybeNavKey ( 1711211815576, True ) url Nothing
 
-        winterOrdinal =
-            360
-
-        summerOrdinalEnd =
-            winterOrdinal
-
-        summerOrdinal =
-            190
-
         fallOrdinal =
             280
 
         springOrdinal =
             100
-
-        winterMonthsOrdinalStart =
-            fallOrdinal
-
-        winterMonthsOrdinalEnd =
-            springOrdinal
 
         summerMonthsOrdinalStart =
             springOrdinal

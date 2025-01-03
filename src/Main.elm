@@ -13,11 +13,11 @@ import Element.Background as Background
 import Element.Border as Border
 import Element.Events exposing (onClick)
 import Element.Font as Font
-import Element.Input as Input exposing (OptionState(..), Thumb, button)
+import Element.Input as Input exposing (OptionState(..), button)
 import FeatherIcons as Icon exposing (Icon, key)
-import Html exposing (Html, hr, td, th, tr)
-import Html.Attributes exposing (hidden, style, type_, value)
-import Html.Events exposing (onBlur)
+import Html exposing (Html, td, th, tr)
+import Html.Attributes exposing (style, type_, value)
+import Html.Events
 import Http
 import Json.Decode as Decode exposing (Decoder, errorToString)
 import Json.Encode as Encode
@@ -30,7 +30,7 @@ import NewLunarTask exposing (..)
 import Process
 import SHA1
 import SearchBox
-import Set exposing (Set)
+import Set
 import Task
 import Time exposing (utc)
 import Url exposing (Url)
