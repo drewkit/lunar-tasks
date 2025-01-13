@@ -1929,7 +1929,11 @@ viewTask model editingNotes =
                   else
                     row []
                         [ el [ Font.bold ] (text "Notes ")
-                        , el [ onClick ToggleNoteEdit ] (Icon.edit |> Icon.toHtml [] |> Element.html)
+                        , el [ onClick ToggleNoteEdit ]
+                            (Icon.edit
+                                |> Icon.toHtml [ Html.Attributes.style "cursor" "pointer" ]
+                                |> Element.html
+                            )
                         ]
                 , notesField task.notes
                 , column []
