@@ -13,7 +13,7 @@ import Element.Border as Border
 import Element.Events exposing (onClick)
 import Element.Font as Font
 import Element.Input as Input exposing (OptionState(..), Thumb, button)
-import FeatherIcons as Icon exposing (Icon, key)
+import FeatherIcons exposing (key)
 import Html exposing (Html, hr, td, th, tr)
 import Html.Attributes exposing (hidden, style, type_, value)
 import Html.Events exposing (onBlur)
@@ -27,6 +27,8 @@ import LunarTask exposing (..)
 import Markdown.Renderer.ElmUi as Markdown
 import NewLunarTask exposing (..)
 import OUI.Button as Button
+import OUI.Icon
+import OUI.Image as Image
 import OUI.Material as Material
 import OUI.Material.Color as Color
 import OUI.Material.Theme as Theme
@@ -1457,12 +1459,16 @@ viewHeader model =
 
 viewMoon : Element msg
 viewMoon =
-    Icon.moon
-        |> Icon.withSize 3
-        |> Icon.withSizeUnit "em"
-        |> Icon.withStrokeWidth 0.8
-        |> Icon.toHtml []
+    FeatherIcons.moon
+        |> FeatherIcons.withSize 3
+        |> FeatherIcons.withSizeUnit "em"
+        |> FeatherIcons.withStrokeWidth 0.8
+        |> FeatherIcons.toHtml []
         |> Element.html
+
+
+
+-- Material.icon theme FeatherIcons.moon
 
 
 view : Model -> Browser.Document Msg
@@ -1554,8 +1560,8 @@ viewTagSettings maybeSelectedTag model =
                                 allowDeleteTd =
                                     td
                                         []
-                                        [ Icon.trash2
-                                            |> Icon.toHtml
+                                        [ FeatherIcons.trash2
+                                            |> FeatherIcons.toHtml
                                                 [ Html.Events.onClick (DeleteTag tagName)
                                                 , Html.Attributes.style "cursor" "pointer"
                                                 ]
@@ -1563,10 +1569,17 @@ viewTagSettings maybeSelectedTag model =
 
                                 preventDeleteTd =
                                     td
-                                        [ Html.Attributes.title "tasks are still associated with this tag"
+                                        []
+                                        [ FeatherIcons.alertOctagon
+                                            |> FeatherIcons.toHtml
+                                                [ Html.Attributes.title "tasks are still associated with this tag"
+                                                ]
                                         ]
-                                        [ Icon.alertOctagon |> Icon.toHtml [] ]
 
+                                -- td
+                                --     [ Html.Attributes.title "tasks are still associated with this tag"
+                                --     ]
+                                --     [ Material.icon theme FeatherIcons.alertOctagon ]
                                 allowOrPreventTd =
                                     if remainingTasksWithTag model.tasks tagName then
                                         preventDeleteTd
@@ -1596,8 +1609,8 @@ viewTagSettings maybeSelectedTag model =
                                 allowDeleteTd =
                                     td
                                         []
-                                        [ Icon.trash2
-                                            |> Icon.toHtml
+                                        [ FeatherIcons.trash2
+                                            |> FeatherIcons.toHtml
                                                 [ Html.Events.onClick (DeleteTag tagName)
                                                 , Html.Attributes.style "cursor" "pointer"
                                                 ]
@@ -1607,7 +1620,7 @@ viewTagSettings maybeSelectedTag model =
                                     td
                                         [ Html.Attributes.title "tasks are still associated with this tag"
                                         ]
-                                        [ Icon.alertOctagon |> Icon.toHtml [] ]
+                                        [ FeatherIcons.alertOctagon |> FeatherIcons.toHtml [] ]
 
                                 allowOrPreventTd =
                                     if remainingTasksWithTag model.tasks tagName then
@@ -1664,7 +1677,7 @@ viewTagSettings maybeSelectedTag model =
                             ]
                         , Html.div []
                             [ Html.input [ Html.Attributes.type_ "text", Html.Attributes.placeholder "New Tag Name", Html.Attributes.value model.tagNameInput, Html.Events.onInput UpdatedTagNameInput ] []
-                            , Icon.plusCircle |> Icon.toHtml [ Html.Events.onClick CreateTag ]
+                            , FeatherIcons.plusCircle |> FeatherIcons.toHtml [ Html.Events.onClick CreateTag ]
                             ]
                         ]
 
@@ -1884,7 +1897,7 @@ viewTask model editingNotes =
                             , text " -- "
                             , button []
                                 { onPress = Just EditTaskRemoveManualPastDueDate
-                                , label = Icon.trash2 |> Icon.toHtml [] |> Element.html
+                                , label = FeatherIcons.trash2 |> FeatherIcons.toHtml [] |> Element.html
                                 }
                             ]
 
@@ -1905,7 +1918,7 @@ viewTask model editingNotes =
                   else
                     row []
                         [ el [ Font.bold ] (text "Notes ")
-                        , el [ onClick ToggleNoteEdit ] (Icon.edit |> Icon.toHtml [] |> Element.html)
+                        , el [ onClick ToggleNoteEdit ] (FeatherIcons.edit |> FeatherIcons.toHtml [] |> Element.html)
                         ]
                 , notesField task.notes
                 , column []
@@ -1959,7 +1972,7 @@ enabledFlagEntryToListedItem flag =
         , text " -- "
         , button []
             { onPress = Just (EditTaskDisableTag flag)
-            , label = Icon.trash2 |> Icon.toHtml [] |> Element.html
+            , label = FeatherIcons.trash2 |> FeatherIcons.toHtml [] |> Element.html
             }
         ]
 
@@ -1976,19 +1989,19 @@ completedEntryToListedItem entryTime =
         [ text (Date.toIsoString entryTime ++ " -- ")
         , button []
             { onPress = Just (EditTaskRemoveCompletionEntry entryTime)
-            , label = Icon.trash2 |> Icon.toHtml [] |> Element.html
+            , label = FeatherIcons.trash2 |> FeatherIcons.toHtml [] |> Element.html
             }
         ]
 
 
-viewLandingBulletPoint : Icon -> String -> Element msg
+viewLandingBulletPoint : FeatherIcons.Icon -> String -> Element msg
 viewLandingBulletPoint icon message =
     let
         elIcon =
             icon
-                |> Icon.withSize 2
-                |> Icon.withSizeUnit "em"
-                |> Icon.toHtml []
+                |> FeatherIcons.withSize 2
+                |> FeatherIcons.withSizeUnit "em"
+                |> FeatherIcons.toHtml []
                 |> Element.html
     in
     column
@@ -2020,22 +2033,22 @@ viewLandingPage =
         , spaceEvenly
         ]
         [ viewLandingBulletPoint
-            Icon.archive
+            FeatherIcons.archive
             "For recurring, non urgent tasks (that eventually become urgent)."
         , viewLandingBulletPoint
-            Icon.bellOff
+            FeatherIcons.bellOff
             "From lubricating garage door springs to shampooing unsoiled carpets, most tasks don't need to be completed in a timely fashion."
         , viewLandingBulletPoint
-            Icon.calendar
+            FeatherIcons.calendar
             "Not every chore can or should be managed in a strict calendar week or month. Some tasks end up following more of a lunar calendar trajectory, shifting due dates throughout the year."
         , viewLandingBulletPoint
-            Icon.repeat
+            FeatherIcons.repeat
             "Create a task, set the cadence and mark past due tasks completed. Track completion entries and observe actual vs stated cadences."
         , viewLandingBulletPoint
-            Icon.copy
+            FeatherIcons.copy
             "Fully exportable collection to JSON. Peace of mind with no platform lock."
         , viewLandingBulletPoint
-            Icon.compass
+            FeatherIcons.compass
             "When you're ready to roll up your sleeves and do some chores, LunarTasks will let you know which tasks are ready to get after (again!)."
         ]
 
@@ -2090,10 +2103,10 @@ radioOption label maybeSortOrder state =
                                 Element.none
 
                             Just ASC ->
-                                Icon.trendingUp |> Icon.toHtml [ Html.Attributes.style "color" "gray" ] |> Element.html
+                                FeatherIcons.trendingUp |> FeatherIcons.toHtml [ Html.Attributes.style "color" "gray" ] |> Element.html
 
                             Just DESC ->
-                                Icon.trendingDown |> Icon.toHtml [ Html.Attributes.style "color" "gray" ] |> Element.html
+                                FeatherIcons.trendingDown |> FeatherIcons.toHtml [ Html.Attributes.style "color" "gray" ] |> Element.html
 
                     _ ->
                         Element.none
@@ -2137,7 +2150,7 @@ viewTaskDiscovery model =
                 ]
                 { text = Maybe.withDefault "" model.searchTerm
                 , onChange = Search
-                , placeholder = Just <| Input.placeholder [] <| (Icon.search |> Icon.toHtml [] |> Element.html)
+                , placeholder = Just <| Input.placeholder [] <| (FeatherIcons.search |> FeatherIcons.toHtml [] |> Element.html)
                 , label = Input.labelHidden "search"
                 }
 
@@ -2147,7 +2160,7 @@ viewTaskDiscovery model =
                 , centerY
                 ]
                 { onPress = Just ClearSearch
-                , label = Icon.x |> Icon.toHtml [] |> Element.html
+                , label = FeatherIcons.x |> FeatherIcons.toHtml [] |> Element.html
                 }
 
         displayResetOption : Bool
@@ -2179,10 +2192,10 @@ viewTaskDiscovery model =
                 Unselected
 
         tagSettingsBtn =
-            Icon.settings
-                |> Icon.withSize 2
-                |> Icon.withSizeUnit "em"
-                |> Icon.toHtml
+            FeatherIcons.settings
+                |> FeatherIcons.withSize 2
+                |> FeatherIcons.withSizeUnit "em"
+                |> FeatherIcons.toHtml
                     [ Html.Events.onClick EditTags
                     , Html.Attributes.style "cursor" "pointer"
                     ]
@@ -2264,6 +2277,7 @@ type alias Colors =
     , darkCharcoal : Element.Color
     , green : Element.Color
     , lightBlue : Element.Color
+    , darkBlue : Element.Color
     , lightGrey : Element.Color
     , orange : Element.Color
     , red : Element.Color
@@ -2360,8 +2374,8 @@ viewTaskTable currentDate tasks =
                                 , Html.Attributes.class "selective-icon-opts-checkbox"
                                 , Html.Attributes.title "Mark Task Completed"
                                 ]
-                                [ Html.div [ Html.Attributes.class "selective-icon-activated" ] [ Icon.checkSquare |> Icon.toHtml [] ]
-                                , Html.div [ Html.Attributes.class "selective-icon-inactivated" ] [ Icon.square |> Icon.toHtml [] ]
+                                [ Html.div [ Html.Attributes.class "selective-icon-activated" ] [ FeatherIcons.checkSquare |> FeatherIcons.toHtml [] ]
+                                , Html.div [ Html.Attributes.class "selective-icon-inactivated" ] [ FeatherIcons.square |> FeatherIcons.toHtml [] ]
                                 ]
                             ]
                         , td
@@ -2375,8 +2389,8 @@ viewTaskTable currentDate tasks =
                                 , Html.Attributes.class "selective-icon-opts-checkbox"
                                 , Html.Attributes.title "Delete Task"
                                 ]
-                                [ Html.div [ Html.Attributes.class "selective-icon-activated" ] [ Icon.trash2 |> Icon.toHtml [] ]
-                                , Html.div [ Html.Attributes.class "selective-icon-inactivated" ] [ Icon.trash |> Icon.toHtml [] ]
+                                [ Html.div [ Html.Attributes.class "selective-icon-activated" ] [ FeatherIcons.trash2 |> FeatherIcons.toHtml [] ]
+                                , Html.div [ Html.Attributes.class "selective-icon-inactivated" ] [ FeatherIcons.trash |> FeatherIcons.toHtml [] ]
                                 ]
                             ]
                         ]
@@ -2472,10 +2486,10 @@ viewNewTaskCreateBtn model =
         button [ alignBottom, paddingXY 0 5 ]
             { onPress = Just CreateTask
             , label =
-                Icon.plusCircle
-                    |> Icon.withSize 2
-                    |> Icon.withSizeUnit "em"
-                    |> Icon.toHtml []
+                FeatherIcons.plusCircle
+                    |> FeatherIcons.withSize 2
+                    |> FeatherIcons.withSizeUnit "em"
+                    |> FeatherIcons.toHtml []
                     |> Element.html
             }
 
@@ -2483,11 +2497,11 @@ viewNewTaskCreateBtn model =
         button [ alignBottom, paddingXY 0 5 ]
             { onPress = Nothing
             , label =
-                Icon.plusCircle
-                    |> Icon.withSize 2
-                    |> Icon.withSizeUnit "em"
-                    |> Icon.withClass "disabled-new-task"
-                    |> Icon.toHtml [ Html.Attributes.style "cursor" "default" ]
+                FeatherIcons.plusCircle
+                    |> FeatherIcons.withSize 2
+                    |> FeatherIcons.withSizeUnit "em"
+                    |> FeatherIcons.withClass "disabled-new-task"
+                    |> FeatherIcons.toHtml [ Html.Attributes.style "cursor" "default" ]
                     |> Element.html
             }
 
