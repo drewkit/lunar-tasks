@@ -1,7 +1,7 @@
 /* Table Row Highlighting */
 
-div.gp:has(.task-title):has(+ div.gp +div.gp + div.gp div.selective-icon-opts:hover),
-div.gp:has(.task-title):has(+ div.gp + div.gp +div.gp + div.gp div.selective-icon-opts:hover),
+div.gp:has(.task-title):has(+ div.gp + div.gp + div.gp div.selective-icon-opts:hover),
+div.gp:has(.task-title):has(+ div.gp + div.gp + div.gp + div.gp div.selective-icon-opts:hover),
 #tag-table-body > tr:hover
 {
     background-color: lightgray;
