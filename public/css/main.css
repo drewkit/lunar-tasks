@@ -5,19 +5,14 @@
     background-color: lightgray;
 }
 
-#task-table-body > tr > td.embolden:hover, #tag-table-body > tr > td.embolden:hover
-{
-    text-shadow: 0px 0px 1px black;
-}
-
 /* Table Row Revealing Icon Options with hover */
 
-#task-table-body > tr > td > div.selective-icon-opts
+#task-table-body > .selective-icon-opts
 {
     visibility: hidden;
 }
 
-#task-table-body > tr:hover > td > div.selective-icon-opts
+#task-table-body > .selective-icon-opts:hover
 {
     visibility: visible;
 }
@@ -38,7 +33,7 @@ div.selective-icon-opts-checkbox > div.selective-icon-activated
 
 /* General styling */
 
-table
+/* table
 {
     min-width: 100%;
     border: 1px;
@@ -59,7 +54,7 @@ table tr td, table tr th
     border: solid;
     border-width: thin;
     font-size: 22px;
-}
+} */
 
 .disabled-new-task
 {

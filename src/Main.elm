@@ -1478,6 +1478,7 @@ viewMoon =
 view : Model -> Browser.Document Msg
 view model =
     let
+        innerContent : Element Msg
         innerContent =
             case model.view of
                 LoginPromptView ->
@@ -2314,98 +2315,92 @@ viewTaskTable currentDate tasks =
 
             else
                 ""
-
-        populateRows : List LunarTask -> List (Element Msg)
-        populateRows data =
-            List.map
-                (\task ->
-                    let
-                        pastDueTask =
-                            pastDue currentDate task
-
-                        pastDueTd =
-                            if pastDueTask then
-                                el
-                                    [ Element.htmlAttribute <|
-                                        Html.Attributes.title
-                                            (periodsLapsedMessage currentDate task)
-                                    ]
-                                    (text <|
-                                        String.fromInt
-                                            (getDaysPastDue currentDate task)
-                                    )
-
-                            else
-                                Element.none
-
-                        lastCompletedTd =
-                            if pastDueTask then
-                                el [] <|
-                                    text (Date.toIsoString (getLastCompletedAt task))
-
-                            else
-                                el
-                                    [ Element.htmlAttribute <|
-                                        Html.Attributes.title
-                                            ("This task will be past due again on " ++ Date.toIsoString (getNextPastDueDate task))
-                                    ]
-                                    (text <|
-                                        Date.toIsoString (getLastCompletedAt task)
-                                    )
-                    in
-                    row []
-                        [ el
-                            [ Element.htmlAttribute <| Html.Attributes.style "cursor" "pointer"
-                            , Element.htmlAttribute <| Html.Events.onClick (EditTask task.id)
-                            , Element.htmlAttribute <| Html.Attributes.class "embolden"
-                            , Element.htmlAttribute <| Html.Attributes.title task.notes
-                            ]
-                          <|
-                            text task.title
-                        , pastDueTd
-                        , el [] <| text (String.fromInt task.period)
-                        , lastCompletedTd
-                        , row
-                            [ Element.htmlAttribute <| Html.Attributes.style "cursor" "pointer"
-                            , Element.htmlAttribute <| Html.Attributes.style "text-align" "center"
-                            , Element.htmlAttribute <| Html.Attributes.class "embolden"
-                            , Element.htmlAttribute <| Html.Events.onClick (MarkCompleted task currentDate)
-                            , Element.htmlAttribute <| Html.Attributes.class "selective-icon-opts"
-                            , Element.htmlAttribute <| Html.Attributes.class "selective-icon-opts-checkbox"
-                            , Element.htmlAttribute <| Html.Attributes.title "Mark Task Completed"
-                            ]
-                            [ el [ Element.htmlAttribute <| Html.Attributes.class "selective-icon-activated" ] (FeatherIcons.checkSquare |> FeatherIcons.toHtml [] |> Element.html)
-                            , el [ Element.htmlAttribute <| Html.Attributes.class "selective-icon-inactivated" ] (FeatherIcons.square |> FeatherIcons.toHtml [] |> Element.html)
-                            ]
-                        , row
-                            [ Element.htmlAttribute <| Html.Attributes.style "cursor" "pointer"
-                            , Element.htmlAttribute <| Html.Attributes.style "text-align" "center"
-                            , Element.htmlAttribute <| Html.Attributes.class "embolden"
-                            , Element.htmlAttribute <| Html.Events.onClick (DeleteTask task)
-                            , Element.htmlAttribute <| Html.Attributes.class "selective-icon-opts"
-                            , Element.htmlAttribute <| Html.Attributes.class "selective-icon-opts-checkbox"
-                            , Element.htmlAttribute <| Html.Attributes.title "Delete Task"
-                            ]
-                            [ el [ Element.htmlAttribute <| Html.Attributes.class "selective-icon-activated" ] (FeatherIcons.trash2 |> FeatherIcons.toHtml [] |> Element.html)
-                            , el [ Element.htmlAttribute <| Html.Attributes.class "selective-icon-inactivated" ] (FeatherIcons.trash |> FeatherIcons.toHtml [] |> Element.html)
-                            ]
-                        ]
-                )
-                data
     in
-    el [ width fill ] <|
-        column []
-            [ row
-                []
-                [ el [ Element.htmlAttribute (Html.Attributes.style "text-align" "left") ] <| text "Task"
-                , el [ Element.htmlAttribute (Html.Attributes.style "text-align" "left") ] <| text "Days Past Due"
-                , el [ Element.htmlAttribute (Html.Attributes.style "text-align" "left") ] <| text "Cadence"
-                , el [ Element.htmlAttribute (Html.Attributes.style "text-align" "left") ] <| text "Last Completed"
-                , el [] <| text ""
-                , el [] <| text ""
-                ]
-            , column [ Element.htmlAttribute (Html.Attributes.id "task-table-body") ] (populateRows tasks)
+    Element.table [ width shrink, spacing 10, htmlAttribute <| Html.Attributes.id "task-table-body" ]
+        { data = tasks
+        , columns =
+            [ { header = text "Task"
+              , width = fill
+              , view =
+                    \task ->
+                        el
+                            [ pointer
+                            , onClick (EditTask task.id)
+                            , htmlAttribute <| Html.Attributes.title task.notes
+                            ]
+                        <|
+                            text task.title
+              }
+            , { header = text "Past Due"
+              , width = fill
+              , view =
+                    \task ->
+                        if pastDue currentDate task then
+                            el
+                                [ htmlAttribute <|
+                                    Html.Attributes.title
+                                        (periodsLapsedMessage currentDate task)
+                                ]
+                                (text <|
+                                    String.fromInt
+                                        (getDaysPastDue currentDate task)
+                                )
+
+                        else
+                            Element.none
+              }
+            , { header = text "Last Completed"
+              , width = fill
+              , view =
+                    \task ->
+                        if pastDue currentDate task then
+                            el [] <|
+                                text (Date.toIsoString (getLastCompletedAt task))
+
+                        else
+                            el
+                                [ Element.htmlAttribute <|
+                                    Html.Attributes.title
+                                        ("This task will be past due again on " ++ Date.toIsoString (getNextPastDueDate task))
+                                ]
+                                (text <|
+                                    Date.toIsoString (getLastCompletedAt task)
+                                )
+              }
+            , { header = text ""
+              , width = shrink
+              , view =
+                    \task ->
+                        row
+                            [ pointer
+                            , centerX
+                            , onClick (MarkCompleted task currentDate)
+                            , htmlAttribute <| Html.Attributes.title "Mark Task Completed"
+                            , htmlAttribute <| Html.Attributes.class "selective-icon-opts"
+                            , htmlAttribute <| Html.Attributes.class "selective-icon-opts-checkbox"
+                            ]
+                            [ el [ htmlAttribute <| Html.Attributes.class "selective-icon-activated" ] (FeatherIcons.checkSquare |> FeatherIcons.toHtml [] |> Element.html)
+                            , el [ htmlAttribute <| Html.Attributes.class "selective-icon-inactivated" ] (FeatherIcons.square |> FeatherIcons.toHtml [] |> Element.html)
+                            ]
+              }
+            , { header = text ""
+              , width = shrink
+              , view =
+                    \task ->
+                        row
+                            [ pointer
+                            , centerX
+                            , onClick (DeleteTask task)
+                            , htmlAttribute <| Html.Attributes.title "Delete Task"
+                            , htmlAttribute <| Html.Attributes.class "selective-icon-opts"
+                            , htmlAttribute <| Html.Attributes.class "selective-icon-opts-checkbox"
+                            ]
+                            [ el [ htmlAttribute <| Html.Attributes.class "selective-icon-activated" ] (FeatherIcons.trash2 |> FeatherIcons.toHtml [] |> Element.html)
+                            , el [ htmlAttribute <| Html.Attributes.class "selective-icon-inactivated" ] (FeatherIcons.trash |> FeatherIcons.toHtml [] |> Element.html)
+                            ]
+              }
             ]
+        }
 
 
 type TagToggleState
