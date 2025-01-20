@@ -25,6 +25,8 @@ import List
 import ListSettings exposing (..)
 import LunarTask exposing (..)
 import Markdown.Renderer.ElmUi as Markdown
+import Material.Icons
+import Material.Icons.Types exposing (Coloring(..))
 import NewLunarTask exposing (..)
 import OUI.Button as Button
 import OUI.Icon
@@ -1468,7 +1470,9 @@ viewMoon =
 
 
 
--- Material.icon theme FeatherIcons.moon
+-- viewMoon : Element msg
+-- viewMoon =
+--     Material.icon theme [] (OUI.Icon.elmMaterialIcons Color Material.Icons.dark_mode)
 
 
 view : Model -> Browser.Document Msg
@@ -1529,57 +1533,52 @@ viewTagSettings maybeSelectedTag model =
             in
             List.any (\t -> tagMatch t.bitTags) tasks
 
-        populateRows : Maybe String -> List (Html Msg)
+        populateRows : Maybe String -> List (Element Msg)
         populateRows maybeTag =
             case maybeTag of
                 Just tag ->
                     List.map
                         (\tagName ->
                             let
-                                tagNameTd : Html Msg
+                                tagNameTd : Element Msg
                                 tagNameTd =
                                     if tag == tagName then
-                                        td []
-                                            [ Html.input
-                                                [ type_ "text"
-                                                , value model.tagNameInput
-                                                , Html.Events.onInput UpdatedTagNameInput
-                                                ]
-                                                []
-                                            , Html.button [ Html.Events.onClick (UpdateTag tagName) ] [ Html.text "Save" ]
-                                            , Html.button [ Html.Events.onClick (SelectTagToEdit Nothing) ] [ Html.text "Cancel" ]
+                                        row []
+                                            [ Input.text []
+                                                { onChange = UpdatedTagNameInput
+                                                , placeholder = Nothing
+                                                , label = Input.labelHidden "tagNameText"
+                                                , text = tagName
+                                                }
+                                            , Input.button [] { onPress = Just (UpdateTag tagName), label = text "Save" }
+                                            , Input.button [] { onPress = Just (SelectTagToEdit Nothing), label = text "Cancel" }
                                             ]
 
                                     else
-                                        td
-                                            [ Html.Attributes.class "embolden"
-                                            , Html.Events.onClick (SelectTagToEdit Nothing)
+                                        row [ Element.htmlAttribute <| Html.Attributes.class "embolden" ]
+                                            [ Input.button [] { onPress = Just (SelectTagToEdit Nothing), label = text tagName }
                                             ]
-                                            [ Html.text tagName ]
 
                                 allowDeleteTd =
-                                    td
-                                        []
-                                        [ FeatherIcons.trash2
+                                    el []
+                                        (FeatherIcons.trash2
                                             |> FeatherIcons.toHtml
                                                 [ Html.Events.onClick (DeleteTag tagName)
                                                 , Html.Attributes.style "cursor" "pointer"
                                                 ]
-                                        ]
+                                            |> Element.html
+                                        )
 
                                 preventDeleteTd =
-                                    td
+                                    el
                                         []
-                                        [ FeatherIcons.alertOctagon
+                                        (FeatherIcons.alertOctagon
                                             |> FeatherIcons.toHtml
                                                 [ Html.Attributes.title "tasks are still associated with this tag"
                                                 ]
-                                        ]
+                                            |> Element.html
+                                        )
 
-                                -- td
-                                --     [ Html.Attributes.title "tasks are still associated with this tag"
-                                --     ]
-                                --     [ Material.icon theme FeatherIcons.alertOctagon ]
                                 allowOrPreventTd =
                                     if remainingTasksWithTag model.tasks tagName then
                                         preventDeleteTd
@@ -1587,7 +1586,7 @@ viewTagSettings maybeSelectedTag model =
                                     else
                                         allowDeleteTd
                             in
-                            tr []
+                            row []
                                 [ tagNameTd
                                 , allowOrPreventTd
                                 ]
@@ -1598,29 +1597,34 @@ viewTagSettings maybeSelectedTag model =
                     List.map
                         (\tagName ->
                             let
-                                tagNameTd : Html Msg
+                                tagNameTd : Element Msg
                                 tagNameTd =
-                                    td
-                                        [ Html.Attributes.class "embolden"
-                                        , Html.Events.onClick (SelectTagToEdit (Just tagName))
+                                    el
+                                        [ Element.htmlAttribute <| Html.Attributes.class "embolden"
+                                        , Element.htmlAttribute <| Html.Events.onClick (SelectTagToEdit (Just tagName))
                                         ]
-                                        [ Html.text tagName ]
+                                        (text tagName)
 
+                                allowDeleteTd : Element Msg
                                 allowDeleteTd =
-                                    td
+                                    el
                                         []
-                                        [ FeatherIcons.trash2
+                                        (FeatherIcons.trash2
                                             |> FeatherIcons.toHtml
                                                 [ Html.Events.onClick (DeleteTag tagName)
                                                 , Html.Attributes.style "cursor" "pointer"
                                                 ]
-                                        ]
+                                            |> Element.html
+                                        )
 
                                 preventDeleteTd =
-                                    td
-                                        [ Html.Attributes.title "tasks are still associated with this tag"
+                                    el
+                                        [ Element.htmlAttribute <| Html.Attributes.title "tasks are still associated with this tag"
                                         ]
-                                        [ FeatherIcons.alertOctagon |> FeatherIcons.toHtml [] ]
+                                        (FeatherIcons.alertOctagon
+                                            |> FeatherIcons.toHtml []
+                                            |> Element.html
+                                        )
 
                                 allowOrPreventTd =
                                     if remainingTasksWithTag model.tasks tagName then
@@ -1629,7 +1633,7 @@ viewTagSettings maybeSelectedTag model =
                                     else
                                         allowDeleteTd
                             in
-                            tr []
+                            row []
                                 [ tagNameTd
                                 , allowOrPreventTd
                                 ]
@@ -1638,48 +1642,39 @@ viewTagSettings maybeSelectedTag model =
     in
     case maybeSelectedTag of
         Just selectedTag ->
-            el [ width fill ] <|
-                Element.html <|
-                    Html.div []
-                        [ Html.table []
-                            [ Html.thead []
-                                [ tr
-                                    []
-                                    [ th
-                                        [ Html.Attributes.style "text-align" "left"
-                                        , Html.Events.onClick (SelectTagToEdit Nothing)
-                                        ]
-                                        [ Html.text "Tag Name" ]
-                                    , th [] []
-                                    ]
-                                ]
-                            , Html.tbody [ Html.Attributes.id "tag-table-body" ] (populateRows (Just selectedTag))
-                            ]
+            column [ width fill ]
+                [ row []
+                    [ el
+                        [ Element.htmlAttribute <| Html.Attributes.style "text-align" "left"
+                        , Element.htmlAttribute <| Html.Events.onClick (SelectTagToEdit Nothing)
                         ]
+                        (text "Tag Name")
+                    , el [] Element.none
+                    ]
+                , column [ Element.htmlAttribute <| Html.Attributes.id "tag-table-body" ] (populateRows (Just selectedTag))
+                ]
 
         Nothing ->
-            el [ width fill ] <|
-                Element.html <|
-                    Html.div []
-                        [ Html.table []
-                            [ Html.thead []
-                                [ tr
-                                    []
-                                    [ th
-                                        [ Html.Attributes.style "text-align" "left"
-                                        , Html.Events.onClick (SelectTagToEdit Nothing)
-                                        ]
-                                        [ Html.text "Tag Name" ]
-                                    , th [] []
-                                    ]
-                                ]
-                            , Html.tbody [ Html.Attributes.id "tag-table-body" ] (populateRows Nothing)
-                            ]
-                        , Html.div []
-                            [ Html.input [ Html.Attributes.type_ "text", Html.Attributes.placeholder "New Tag Name", Html.Attributes.value model.tagNameInput, Html.Events.onInput UpdatedTagNameInput ] []
-                            , FeatherIcons.plusCircle |> FeatherIcons.toHtml [ Html.Events.onClick CreateTag ]
-                            ]
+            column [ width fill ]
+                [ row []
+                    [ el
+                        [ Element.htmlAttribute <| Html.Attributes.style "text-align" "left"
+                        , Element.htmlAttribute <| Html.Events.onClick (SelectTagToEdit Nothing)
                         ]
+                        (text "Tag Name")
+                    , el [] Element.none
+                    ]
+                , column [ Element.htmlAttribute <| Html.Attributes.id "tag-table-body" ] (populateRows Nothing)
+                , row []
+                    [ Input.text []
+                        { onChange = UpdatedTagNameInput
+                        , text = model.tagNameInput
+                        , placeholder = Just (Input.placeholder [] <| text "New Tag Name")
+                        , label = Input.labelHidden "newTagName"
+                        }
+                    , el [] (FeatherIcons.plusCircle |> FeatherIcons.toHtml [ Html.Events.onClick CreateTag ] |> Element.html)
+                    ]
+                ]
 
 
 viewTasksJson : Model -> Element Msg
@@ -2272,7 +2267,7 @@ viewMain model =
         ]
 
 
-type alias Colors =
+type alias CustomColors =
     { blue : Element.Color
     , darkCharcoal : Element.Color
     , green : Element.Color
@@ -2287,7 +2282,7 @@ type alias Colors =
     }
 
 
-color : Colors
+color : CustomColors
 color =
     { blue = rgb255 0x72 0x9F 0xCF
     , darkCharcoal = rgb255 0x2E 0x34 0x36
@@ -2320,7 +2315,7 @@ viewTaskTable currentDate tasks =
             else
                 ""
 
-        populateRows : List LunarTask -> List (Html Msg)
+        populateRows : List LunarTask -> List (Element Msg)
         populateRows data =
             List.map
                 (\task ->
@@ -2330,91 +2325,87 @@ viewTaskTable currentDate tasks =
 
                         pastDueTd =
                             if pastDueTask then
-                                td
-                                    [ Html.Attributes.title
-                                        (periodsLapsedMessage currentDate task)
+                                el
+                                    [ Element.htmlAttribute <|
+                                        Html.Attributes.title
+                                            (periodsLapsedMessage currentDate task)
                                     ]
-                                    [ Html.text <| String.fromInt (getDaysPastDue currentDate task) ]
+                                    (text <|
+                                        String.fromInt
+                                            (getDaysPastDue currentDate task)
+                                    )
 
                             else
-                                td [] []
+                                Element.none
 
                         lastCompletedTd =
                             if pastDueTask then
-                                td []
-                                    [ Html.text <| Date.toIsoString (getLastCompletedAt task) ]
+                                el [] <|
+                                    text (Date.toIsoString (getLastCompletedAt task))
 
                             else
-                                td
-                                    [ Html.Attributes.title
-                                        ("This task will be past due again on " ++ Date.toIsoString (getNextPastDueDate task))
+                                el
+                                    [ Element.htmlAttribute <|
+                                        Html.Attributes.title
+                                            ("This task will be past due again on " ++ Date.toIsoString (getNextPastDueDate task))
                                     ]
-                                    [ Html.text <| Date.toIsoString (getLastCompletedAt task) ]
+                                    (text <|
+                                        Date.toIsoString (getLastCompletedAt task)
+                                    )
                     in
-                    tr []
-                        [ td
-                            [ Html.Attributes.style "cursor" "pointer"
-                            , Html.Events.onClick (EditTask task.id)
-                            , Html.Attributes.class "embolden"
-                            , Html.Attributes.title task.notes
+                    row []
+                        [ el
+                            [ Element.htmlAttribute <| Html.Attributes.style "cursor" "pointer"
+                            , Element.htmlAttribute <| Html.Events.onClick (EditTask task.id)
+                            , Element.htmlAttribute <| Html.Attributes.class "embolden"
+                            , Element.htmlAttribute <| Html.Attributes.title task.notes
                             ]
-                            [ Html.text task.title ]
+                          <|
+                            text task.title
                         , pastDueTd
-                        , td []
-                            [ Html.text <| String.fromInt task.period ]
+                        , el [] <| text (String.fromInt task.period)
                         , lastCompletedTd
-                        , td
-                            [ Html.Attributes.style "cursor" "pointer"
-                            , Html.Attributes.style "text-align" "center"
-                            , Html.Attributes.class "embolden"
-                            , Html.Events.onClick (MarkCompleted task currentDate)
+                        , row
+                            [ Element.htmlAttribute <| Html.Attributes.style "cursor" "pointer"
+                            , Element.htmlAttribute <| Html.Attributes.style "text-align" "center"
+                            , Element.htmlAttribute <| Html.Attributes.class "embolden"
+                            , Element.htmlAttribute <| Html.Events.onClick (MarkCompleted task currentDate)
+                            , Element.htmlAttribute <| Html.Attributes.class "selective-icon-opts"
+                            , Element.htmlAttribute <| Html.Attributes.class "selective-icon-opts-checkbox"
+                            , Element.htmlAttribute <| Html.Attributes.title "Mark Task Completed"
                             ]
-                            [ Html.div
-                                [ Html.Attributes.class "selective-icon-opts"
-                                , Html.Attributes.class "selective-icon-opts-checkbox"
-                                , Html.Attributes.title "Mark Task Completed"
-                                ]
-                                [ Html.div [ Html.Attributes.class "selective-icon-activated" ] [ FeatherIcons.checkSquare |> FeatherIcons.toHtml [] ]
-                                , Html.div [ Html.Attributes.class "selective-icon-inactivated" ] [ FeatherIcons.square |> FeatherIcons.toHtml [] ]
-                                ]
+                            [ el [ Element.htmlAttribute <| Html.Attributes.class "selective-icon-activated" ] (FeatherIcons.checkSquare |> FeatherIcons.toHtml [] |> Element.html)
+                            , el [ Element.htmlAttribute <| Html.Attributes.class "selective-icon-inactivated" ] (FeatherIcons.square |> FeatherIcons.toHtml [] |> Element.html)
                             ]
-                        , td
-                            [ Html.Attributes.style "cursor" "pointer"
-                            , Html.Attributes.style "text-align" "center"
-                            , Html.Attributes.class "embolden"
-                            , Html.Events.onClick (DeleteTask task)
+                        , row
+                            [ Element.htmlAttribute <| Html.Attributes.style "cursor" "pointer"
+                            , Element.htmlAttribute <| Html.Attributes.style "text-align" "center"
+                            , Element.htmlAttribute <| Html.Attributes.class "embolden"
+                            , Element.htmlAttribute <| Html.Events.onClick (DeleteTask task)
+                            , Element.htmlAttribute <| Html.Attributes.class "selective-icon-opts"
+                            , Element.htmlAttribute <| Html.Attributes.class "selective-icon-opts-checkbox"
+                            , Element.htmlAttribute <| Html.Attributes.title "Delete Task"
                             ]
-                            [ Html.div
-                                [ Html.Attributes.class "selective-icon-opts"
-                                , Html.Attributes.class "selective-icon-opts-checkbox"
-                                , Html.Attributes.title "Delete Task"
-                                ]
-                                [ Html.div [ Html.Attributes.class "selective-icon-activated" ] [ FeatherIcons.trash2 |> FeatherIcons.toHtml [] ]
-                                , Html.div [ Html.Attributes.class "selective-icon-inactivated" ] [ FeatherIcons.trash |> FeatherIcons.toHtml [] ]
-                                ]
+                            [ el [ Element.htmlAttribute <| Html.Attributes.class "selective-icon-activated" ] (FeatherIcons.trash2 |> FeatherIcons.toHtml [] |> Element.html)
+                            , el [ Element.htmlAttribute <| Html.Attributes.class "selective-icon-inactivated" ] (FeatherIcons.trash |> FeatherIcons.toHtml [] |> Element.html)
                             ]
                         ]
                 )
                 data
     in
     el [ width fill ] <|
-        Element.html <|
-            Html.table []
-                [ Html.thead []
-                    [ tr
-                        []
-                        [ th [ Html.Attributes.style "text-align" "left" ]
-                            [ Html.text "Task" ]
-                        , th [ Html.Attributes.style "text-align" "left" ] [ Html.text "Days Past Due" ]
-                        , th [ Html.Attributes.style "text-align" "left" ] [ Html.text "Cadence" ]
-                        , th [ Html.Attributes.style "text-align" "left" ]
-                            [ Html.text "Last Completed" ]
-                        , th [] [ Html.text "" ]
-                        , th [] [ Html.text "" ]
-                        ]
-                    ]
-                , Html.tbody [ Html.Attributes.id "task-table-body" ] (populateRows tasks)
+        column []
+            [ row
+                []
+                [ el [ Element.htmlAttribute (Html.Attributes.style "text-align" "left") ] <| text "Task"
+                , el [ Element.htmlAttribute (Html.Attributes.style "text-align" "left") ] <| text "Days Past Due"
+                , el [ Element.htmlAttribute (Html.Attributes.style "text-align" "left") ] <| text "Cadence"
+                , el [ Element.htmlAttribute (Html.Attributes.style "text-align" "left") ] <| text "Last Completed"
+                , el [] <| text ""
+                , el [] <| text ""
                 ]
+            , column [ Element.htmlAttribute (Html.Attributes.id "task-table-body") ] (populateRows tasks)
+            ]
 
 
 type TagToggleState

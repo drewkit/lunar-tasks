@@ -18,6 +18,7 @@
             "elm/url": "1.0.0",
             "elm-community/json-extra": "4.3.0",
             "feathericons/elm-feather": "1.5.0",
+            "icidasset/elm-material-icons": "11.0.0",
             "jmpavlick/elm-ui-markdown": "1.0.0",
             "justinmimbs/date": "3.2.1",
             "mdgriffith/elm-ui": "1.1.8",
@@ -36,11 +37,11 @@
             "elm/svg": "1.0.1",
             "elm/virtual-dom": "1.0.3",
             "elm-community/result-extra": "2.4.0",
-            "rtfeldman/elm-hex": "1.0.0",
-            "rtfeldman/elm-iso8601-date-strings": "1.1.4",
             "fredcy/elm-parseint": "2.0.1",
             "noahzgordon/elm-color-extra": "1.0.2",
-            "orus-io/elm-spa": "3.0.1"
+            "orus-io/elm-spa": "3.0.1",
+            "rtfeldman/elm-hex": "1.0.0",
+            "rtfeldman/elm-iso8601-date-strings": "1.1.4"
         }
     },
     "test-dependencies": {
