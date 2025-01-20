@@ -11,7 +11,7 @@ import Element exposing (..)
 import Element.Background as Background
 import Element.Border as Border
 import Element.Events exposing (onClick)
-import Element.Font as Font
+import Element.Font as Font exposing (bold)
 import Element.Input as Input exposing (OptionState(..), Thumb, button)
 import FeatherIcons exposing (key)
 import Html exposing (Html, hr, td, th, tr)
@@ -2315,11 +2315,19 @@ viewTaskTable currentDate tasks =
 
             else
                 ""
+
+        headerAttrs =
+            [ bold
+            ]
     in
-    Element.table [ width shrink, spacing 10, htmlAttribute <| Html.Attributes.id "task-table-body" ]
+    Element.table
+        [ width shrink
+        , spacingXY 10 5
+        , htmlAttribute <| Html.Attributes.id "task-table-body"
+        ]
         { data = tasks
         , columns =
-            [ { header = text "Task"
+            [ { header = el headerAttrs <| text "Task"
               , width = fill
               , view =
                     \task ->
@@ -2327,11 +2335,12 @@ viewTaskTable currentDate tasks =
                             [ pointer
                             , onClick (EditTask task.id)
                             , htmlAttribute <| Html.Attributes.title task.notes
+                            , htmlAttribute <| Html.Attributes.class "task-title"
                             ]
                         <|
                             text task.title
               }
-            , { header = text "Past Due"
+            , { header = el headerAttrs <| text "Days Past Due"
               , width = fill
               , view =
                     \task ->
@@ -2349,7 +2358,7 @@ viewTaskTable currentDate tasks =
                         else
                             Element.none
               }
-            , { header = text "Last Completed"
+            , { header = el headerAttrs <| text "Last Completed"
               , width = fill
               , view =
                     \task ->
@@ -2367,7 +2376,7 @@ viewTaskTable currentDate tasks =
                                     Date.toIsoString (getLastCompletedAt task)
                                 )
               }
-            , { header = text ""
+            , { header = Element.none
               , width = shrink
               , view =
                     \task ->
@@ -2383,7 +2392,7 @@ viewTaskTable currentDate tasks =
                             , el [ htmlAttribute <| Html.Attributes.class "selective-icon-inactivated" ] (FeatherIcons.square |> FeatherIcons.toHtml [] |> Element.html)
                             ]
               }
-            , { header = text ""
+            , { header = Element.none
               , width = shrink
               , view =
                     \task ->

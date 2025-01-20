@@ -1,20 +1,10 @@
 /* Table Row Highlighting */
 
-#task-table-body > tr:hover, #tag-table-body > tr:hover
+div.gp:has(.task-title):has(+ div.gp +div.gp + div.gp div.selective-icon-opts:hover),
+div.gp:has(.task-title):has(+ div.gp + div.gp +div.gp + div.gp div.selective-icon-opts:hover),
+#tag-table-body > tr:hover
 {
     background-color: lightgray;
-}
-
-/* Table Row Revealing Icon Options with hover */
-
-#task-table-body > .selective-icon-opts
-{
-    visibility: hidden;
-}
-
-#task-table-body > .selective-icon-opts:hover
-{
-    visibility: visible;
 }
 
 /* Square icon transitioning to checked when hovering over checkbox */
@@ -22,7 +12,7 @@
 div.selective-icon-opts-checkbox:hover > div.selective-icon-activated
 {
 
-    display: block;
+    display: contents;
 }
 
 div.selective-icon-opts-checkbox:hover > div.selective-icon-inactivated,
@@ -32,29 +22,6 @@ div.selective-icon-opts-checkbox > div.selective-icon-activated
 }
 
 /* General styling */
-
-/* table
-{
-    min-width: 100%;
-    border: 1px;
-    border: solid;
-    border-width: thin;
-    font-size: 22px;
-}
-
-table thead th
-{
-    text-align: center;
-    padding: 5px;
-}
-
-table tr td, table tr th
-{
-    border: 1px;
-    border: solid;
-    border-width: thin;
-    font-size: 22px;
-} */
 
 .disabled-new-task
 {
