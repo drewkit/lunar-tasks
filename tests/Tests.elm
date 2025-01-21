@@ -3,7 +3,7 @@ module Tests exposing (..)
 import Date
 import Expect
 import ListSettings exposing (..)
-import LunarTask exposing (LunarTask, SeasonalData(..), genTaskWithOptions, getHistoricalCadence, getLastCompletedAt, getSeasonalData, markTaskCompleted, pastDue)
+import LunarTask exposing (SeasonalData(..), genTaskWithOptions, getHistoricalCadence, getLastCompletedAt, getSeasonalData, markTaskCompleted, pastDue)
 import Main exposing (..)
 import Test exposing (..)
 import Time
