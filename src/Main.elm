@@ -36,9 +36,10 @@ import Task
 import Time exposing (utc)
 import Url exposing (Url)
 import Url.Parser exposing ((<?>))
-import Widget
+import Widget exposing (Button)
 import Widget.Icon as Icon exposing (Icon)
 import Widget.Material as Material
+import Widget.Material.Typography as Typography
 
 
 
@@ -1343,45 +1344,57 @@ update msg model =
 
 
 -- VIEW
--- headerFontColor =
---     color.darkBlue
 
 
-loginlogoutButton : ViewState -> Element Msg
-loginlogoutButton viewType =
+materialPalette =
+    Material.defaultPalette
+
+
+loginlogoutButtons : ViewState -> List (Button Msg)
+loginlogoutButtons viewType =
     let
-        rowSpecs =
-            [ alignRight, spacing 15 ]
+        loginButtons : List (Button Msg)
+        loginButtons =
+            [ { text = "Sign in with Google"
+              , onPress = Just <| LoginUser 0
+              , icon = FeatherIcons.facebook |> Icon.elmFeather FeatherIcons.toHtml
+              }
+            , { text = "Demo Mode"
+              , onPress = Just <| DemoLoginUser 0
+              , icon = FeatherIcons.droplet |> Icon.elmFeather FeatherIcons.toHtml
+              }
+            ]
 
-        loginButton =
-            row rowSpecs
-                [ Widget.textButton (Material.textButton Material.defaultPalette) { text = "Sign in with Google", onPress = Just <| LoginUser 0, icon = FeatherIcons.facebook |> Icon.elmFeather FeatherIcons.toHtml }
-                , Widget.textButton (Material.textButton Material.defaultPalette) { text = "Demo Mode", onPress = Just <| DemoLoginUser 0, icon = FeatherIcons.droplet |> Icon.elmFeather FeatherIcons.toHtml }
-                ]
-
+        exportButton : Button Msg
         exportButton =
             case viewType of
                 LoadedTasksView MainTasksView ->
-                    Widget.textButton (Material.textButton Material.defaultPalette)
-                        { text = "JSON export", onPress = Just <| ViewChange (LoadedTasksView JsonExportView), icon = FeatherIcons.droplet |> Icon.elmFeather FeatherIcons.toHtml }
+                    { text = "JSON export"
+                    , onPress = Just <| ViewChange (LoadedTasksView JsonExportView)
+                    , icon = FeatherIcons.droplet |> Icon.elmFeather FeatherIcons.toHtml
+                    }
 
                 _ ->
-                    Widget.textButton (Material.textButton Material.defaultPalette)
-                        { text = "Return to Main", onPress = Just <| ViewChange (LoadedTasksView MainTasksView), icon = FeatherIcons.droplet |> Icon.elmFeather FeatherIcons.toHtml }
+                    { text = "Return to Main"
+                    , onPress = Just <| ViewChange (LoadedTasksView MainTasksView)
+                    , icon = FeatherIcons.droplet |> Icon.elmFeather FeatherIcons.toHtml
+                    }
 
-        logoutButton =
-            row rowSpecs
-                [ exportButton
-                , Widget.textButton (Material.textButton Material.defaultPalette)
-                    { text = "Log Out", onPress = Just <| LogOutUser 0, icon = FeatherIcons.droplet |> Icon.elmFeather FeatherIcons.toHtml }
-                ]
+        logoutButtons : List (Button Msg)
+        logoutButtons =
+            [ exportButton
+            , { text = "Log Out"
+              , onPress = Just <| LogOutUser 0
+              , icon = FeatherIcons.droplet |> Icon.elmFeather FeatherIcons.toHtml
+              }
+            ]
     in
     case viewType of
         LoginPromptView ->
-            loginButton
+            loginButtons
 
         _ ->
-            logoutButton
+            logoutButtons
 
 
 viewDemoModeBanner : Bool -> Element msg
@@ -1405,10 +1418,6 @@ viewLayout model innerContent =
     layout
         [ width fill
         , height fill
-        , Font.family
-            [ Font.typeface "Times New Roman"
-            , Font.serif
-            ]
         ]
     <|
         column [ width fill ]
@@ -1420,30 +1429,19 @@ viewLayout model innerContent =
 
 viewHeader : Model -> Element Msg
 viewHeader model =
-    column
-        [ height <| fillPortion 2
-        , width fill
-        ]
-        [ row
-            [ width fill
-            , padding 20
-            , Background.color color.lightBlue
-            ]
-            [ Widget.button
-                (Material.outlinedButton Material.defaultPalette)
-                { text = "LunarTasks", onPress = Just ReturnToMain, icon = moonIcon }
-            , loginlogoutButton model.view
-            ]
-        ]
-
-
-moonIcon : Icon msg
-moonIcon =
-    FeatherIcons.moon
-        |> FeatherIcons.withSize 4
-        |> FeatherIcons.withSizeUnit "em"
-        |> FeatherIcons.withStrokeWidth 1
-        |> Icon.elmFeather FeatherIcons.toHtml
+    Widget.menuBar (Material.menuBar materialPalette)
+        { title =
+            "LunarTasks"
+                |> text
+                |> el Typography.h4
+        , deviceClass = Desktop
+        , openRightSheet = Nothing
+        , openTopSheet = Nothing
+        , search = Nothing
+        , openLeftSheet = Nothing
+        , primaryActions =
+            loginlogoutButtons model.view
+        }
 
 
 view : Model -> Browser.Document Msg
@@ -1540,7 +1538,7 @@ viewTagSettings maybeSelectedTag model =
                                     in
                                     el [ pointer ] <|
                                         Widget.iconButton
-                                            (Material.iconButton Material.defaultPalette)
+                                            (Material.iconButton materialPalette)
                                             { text = "delete tag", icon = trash2Icon, onPress = Just <| DeleteTag tagName }
 
                                 preventDeleteTd =
@@ -1551,7 +1549,7 @@ viewTagSettings maybeSelectedTag model =
                                                 |> Icon.elmFeather FeatherIcons.toHtml
                                     in
                                     Widget.iconButton
-                                        (Material.iconButton Material.defaultPalette)
+                                        (Material.iconButton materialPalette)
                                         { text = "tasks are still associated with this tag", icon = alertOctagonIcon, onPress = Nothing }
 
                                 allowOrPreventTd =
@@ -1588,7 +1586,7 @@ viewTagSettings maybeSelectedTag model =
                                     in
                                     el [ pointer ] <|
                                         Widget.iconButton
-                                            (Material.iconButton Material.defaultPalette)
+                                            (Material.iconButton materialPalette)
                                             { text = "delete tag", icon = trash2Icon, onPress = Just <| DeleteTag tagName }
 
                                 preventDeleteTd =
@@ -1599,7 +1597,7 @@ viewTagSettings maybeSelectedTag model =
                                                 |> Icon.elmFeather FeatherIcons.toHtml
                                     in
                                     Widget.iconButton
-                                        (Material.iconButton Material.defaultPalette)
+                                        (Material.iconButton materialPalette)
                                         { text = "tasks are still associated with this tag", icon = alertOctagonIcon, onPress = Nothing }
 
                                 allowOrPreventTd =
@@ -1649,7 +1647,7 @@ viewTagSettings maybeSelectedTag model =
                         , label = Input.labelHidden "newTagName"
                         }
                     , Widget.iconButton
-                        (Material.iconButton Material.defaultPalette)
+                        (Material.iconButton materialPalette)
                         { icon = FeatherIcons.plusCircle |> Icon.elmFeather FeatherIcons.toHtml, text = "save new tag name", onPress = Just CreateTag }
                     ]
                 ]
@@ -1869,7 +1867,7 @@ viewTask model editingNotes =
                             [ el [ Font.bold ] (text <| "Task is manually set to be past due on " ++ Date.toIsoString date)
                             , text " -- "
                             , Widget.iconButton
-                                (Material.iconButton Material.defaultPalette)
+                                (Material.iconButton materialPalette)
                                 { icon = FeatherIcons.trash2 |> Icon.elmFeather FeatherIcons.toHtml
                                 , text = "remove manual past due date"
                                 , onPress = Just EditTaskRemoveManualPastDueDate
@@ -1894,7 +1892,7 @@ viewTask model editingNotes =
                     row []
                         [ el [ Font.bold ] (text "Notes ")
                         , Widget.iconButton
-                            (Material.iconButton Material.defaultPalette)
+                            (Material.iconButton materialPalette)
                             { icon = FeatherIcons.edit |> Icon.elmFeather FeatherIcons.toHtml
                             , onPress = Just ToggleNoteEdit
                             , text = "edit notes"
@@ -1951,7 +1949,7 @@ enabledFlagEntryToListedItem flag =
         [ text flag
         , text " -- "
         , Widget.iconButton
-            (Material.iconButton Material.defaultPalette)
+            (Material.iconButton materialPalette)
             { icon = FeatherIcons.trash2 |> Icon.elmFeather FeatherIcons.toHtml
             , text = flag
             , onPress = Just (EditTaskDisableTag flag)
@@ -1970,7 +1968,7 @@ completedEntryToListedItem entryTime =
     Element.row []
         [ text (Date.toIsoString entryTime ++ " -- ")
         , Widget.iconButton
-            (Material.iconButton Material.defaultPalette)
+            (Material.iconButton materialPalette)
             { icon = FeatherIcons.trash2 |> Icon.elmFeather FeatherIcons.toHtml
             , text = Date.toIsoString entryTime
             , onPress = Just (EditTaskRemoveCompletionEntry entryTime)
@@ -1994,7 +1992,7 @@ viewLandingBulletPoint icon message =
         ]
         [ el [ centerX ] <|
             Widget.iconButton
-                (Material.iconButton Material.defaultPalette)
+                (Material.iconButton materialPalette)
                 { icon = elIcon, text = "bullet point", onPress = Nothing }
         , paragraph
             [ width (fill |> minimum 350)
@@ -2009,13 +2007,14 @@ viewLandingPage =
     wrappedRow
         [ paddingXY 175 100
         , Font.size 28
-        , Font.italic
-        , Font.extraLight
-        , Font.color color.darkBlue
-        , Font.family
-            [ Font.sansSerif
-            , Font.typeface "Roboto"
-            ]
+
+        -- , Font.italic
+        -- , Font.extraLight
+        -- , Font.color color.darkBlue
+        -- , Font.family
+        --     [ Font.sansSerif
+        --     , Font.typeface "Roboto"
+        --     ]
         , spaceEvenly
         ]
         [ viewLandingBulletPoint
@@ -2090,7 +2089,7 @@ radioOption label maybeSortOrder state =
 
                             Just ASC ->
                                 Widget.iconButton
-                                    (Material.iconButton Material.defaultPalette)
+                                    (Material.iconButton materialPalette)
                                     { icon = FeatherIcons.trendingUp |> Icon.elmFeather FeatherIcons.toHtml
                                     , text = "trending up"
                                     , onPress = Nothing
@@ -2098,7 +2097,7 @@ radioOption label maybeSortOrder state =
 
                             Just DESC ->
                                 Widget.iconButton
-                                    (Material.iconButton Material.defaultPalette)
+                                    (Material.iconButton materialPalette)
                                     { icon = FeatherIcons.trendingDown |> Icon.elmFeather FeatherIcons.toHtml
                                     , text = "trending down"
                                     , onPress = Nothing
@@ -2150,7 +2149,7 @@ viewTaskDiscovery model =
                     Just <|
                         Input.placeholder [] <|
                             Widget.iconButton
-                                (Material.iconButton Material.defaultPalette)
+                                (Material.iconButton materialPalette)
                                 { icon = FeatherIcons.search |> Icon.elmFeather FeatherIcons.toHtml
                                 , text = "search"
                                 , onPress = Nothing
@@ -2165,7 +2164,7 @@ viewTaskDiscovery model =
                 ]
             <|
                 Widget.iconButton
-                    (Material.iconButton Material.defaultPalette)
+                    (Material.iconButton materialPalette)
                     { icon = FeatherIcons.x |> Icon.elmFeather FeatherIcons.toHtml
                     , text = "clear search"
                     , onPress = Just ClearSearch
@@ -2193,7 +2192,7 @@ viewTaskDiscovery model =
 
             else if List.length allTags <= 0 then
                 wrappedRow [ spacingXY 10 5 ]
-                    [ Widget.textButton (Material.iconButton Material.defaultPalette)
+                    [ Widget.textButton (Material.iconButton materialPalette)
                         { text = "Create Tags", onPress = Just EditTags, icon = FeatherIcons.droplet |> Icon.elmFeather FeatherIcons.toHtml }
                     ]
 
@@ -2216,7 +2215,7 @@ viewTaskDiscovery model =
 
                     tagSettingsBtn =
                         Widget.iconButton
-                            (Material.iconButton Material.defaultPalette)
+                            (Material.iconButton materialPalette)
                             { icon = IcidOutlinedIcons.settings_suggest |> Icon.elmMaterialIcons Color
                             , text = "tag settings"
                             , onPress = Just EditTags
@@ -2396,14 +2395,14 @@ viewTaskTable currentDate tasks =
                             ]
                             [ el [ htmlAttribute <| Html.Attributes.class "selective-icon-activated" ] <|
                                 Widget.iconButton
-                                    (Material.iconButton Material.defaultPalette)
+                                    (Material.iconButton materialPalette)
                                     { icon = FeatherIcons.checkSquare |> Icon.elmFeather FeatherIcons.toHtml
                                     , text = "mark task completed"
                                     , onPress = Just <| MarkCompleted task currentDate
                                     }
                             , el [ htmlAttribute <| Html.Attributes.class "selective-icon-inactivated" ] <|
                                 Widget.iconButton
-                                    (Material.iconButton Material.defaultPalette)
+                                    (Material.iconButton materialPalette)
                                     { icon = FeatherIcons.square |> Icon.elmFeather FeatherIcons.toHtml
                                     , text = ""
                                     , onPress = Nothing
@@ -2423,14 +2422,14 @@ viewTaskTable currentDate tasks =
                             ]
                             [ el [ htmlAttribute <| Html.Attributes.class "selective-icon-activated" ] <|
                                 Widget.iconButton
-                                    (Material.iconButton Material.defaultPalette)
+                                    (Material.iconButton materialPalette)
                                     { icon = FeatherIcons.trash2 |> Icon.elmFeather FeatherIcons.toHtml
                                     , text = "delete task"
                                     , onPress = Just (DeleteTask task)
                                     }
                             , el [ htmlAttribute <| Html.Attributes.class "selective-icon-inactivated" ] <|
                                 Widget.iconButton
-                                    (Material.iconButton Material.defaultPalette)
+                                    (Material.iconButton materialPalette)
                                     { icon = FeatherIcons.trash |> Icon.elmFeather FeatherIcons.toHtml
                                     , text = ""
                                     , onPress = Nothing
@@ -2449,68 +2448,25 @@ type TagToggleState
 
 viewTagButton : TagToggleState -> String -> Element Msg
 viewTagButton tagToggleState tag =
-    let
-        baseButtonAttrs =
-            [ Font.semiBold
-            , Font.size 15
-            , height (px 42)
-            , paddingXY 15 0
-            , Font.center
-            , Border.width 1
-            , Border.color color.darkCharcoal
-            , Border.rounded 3
-            , Border.shadow
-                { offset = ( 0, 0.2 )
-                , size = 0.05
-                , blur = 0
-                , color = color.darkCharcoal
-                }
-            , Font.family
-                [ Font.typeface "Roboto"
-                , Font.sansSerif
-                ]
-            ]
-    in
     case tagToggleState of
         Unselected ->
-            let
-                unSelectedAttrs =
-                    [ Background.color color.white
-                    , Font.color color.darkCharcoal
-                    ]
-                        ++ baseButtonAttrs
-            in
-            Widget.iconButton (Material.iconButton Material.defaultPalette)
-                { text = tag, onPress = Just <| ToggleTag tag, icon = FeatherIcons.activity |> Icon.elmFeather FeatherIcons.toHtml }
+            Widget.textButton (Material.textButton materialPalette)
+                { text = tag, onPress = Just <| ToggleTag tag }
 
         Whitelisted ->
-            let
-                whitelistedAttrs =
-                    [ Background.color color.darkCharcoal
-                    , Font.color color.white
-                    ]
-                        ++ baseButtonAttrs
-            in
-            Widget.textButton (Material.textButton Material.defaultPalette)
-                { text = tag, onPress = Just <| ToggleTag tag, icon = FeatherIcons.activity |> Icon.elmFeather FeatherIcons.toHtml }
+            Widget.textButton (Material.containedButton materialPalette)
+                { text = tag, onPress = Just <| ToggleTag tag }
 
         Blacklisted ->
-            let
-                blacklistedAttrs =
-                    [ Background.color color.darkCharcoal
-                    , Font.color color.white
-                    , Font.strike
-                    ]
-                        ++ baseButtonAttrs
-            in
-            Widget.textButton (Material.textButton Material.defaultPalette)
-                { text = tag, onPress = Just <| ToggleTag tag, icon = FeatherIcons.activity |> Icon.elmFeather FeatherIcons.toHtml }
+            el [ Font.strike ] <|
+                Widget.textButton (Material.outlinedButton materialPalette)
+                    { text = tag, onPress = Just <| ToggleTag tag }
 
 
 viewNewTaskCreateBtn : Model -> Element Msg
 viewNewTaskCreateBtn model =
     if newLunarTaskReady model then
-        Widget.iconButton (Material.iconButton Material.defaultPalette)
+        Widget.iconButton (Material.iconButton materialPalette)
             { icon =
                 FeatherIcons.plusCircle
                     |> FeatherIcons.withSize 2
@@ -2521,7 +2477,7 @@ viewNewTaskCreateBtn model =
             }
 
     else
-        Widget.iconButton (Material.iconButton Material.defaultPalette)
+        Widget.iconButton (Material.iconButton materialPalette)
             { icon =
                 FeatherIcons.plusCircle
                     |> FeatherIcons.withSize 2
