@@ -5,6 +5,7 @@ import Browser exposing (UrlRequest(..))
 import Browser.Dom as Dom
 import Browser.Events exposing (Visibility(..), onVisibilityChange)
 import Browser.Navigation as Nav
+import Color
 import Date exposing (Date, Unit(..))
 import DatePicker exposing (defaultSettings)
 import Element exposing (..)
@@ -38,7 +39,7 @@ import Url exposing (Url)
 import Url.Parser exposing ((<?>))
 import Widget exposing (Button)
 import Widget.Icon as Icon exposing (Icon)
-import Widget.Material as Material
+import Widget.Material as Material exposing (Palette)
 import Widget.Material.Typography as Typography
 
 
@@ -1346,8 +1347,56 @@ update msg model =
 -- VIEW
 
 
+type alias CustomColors =
+    { blue : Color.Color
+    , turquoise : Color.Color
+    , darkCharcoal : Color.Color
+    , green : Color.Color
+    , lightBlue : Color.Color
+    , darkBlue : Color.Color
+    , lightGrey : Color.Color
+    , orange : Color.Color
+    , red : Color.Color
+    , white : Color.Color
+    , grey : Color.Color
+    , googleLogin : Color.Color
+    , black : Color.Color
+    }
+
+
+color : CustomColors
+color =
+    { blue = Color.rgb255 0x72 0x9F 0xCF
+    , turquoise = Color.rgb255 0xC5 0xF7 0xED
+    , darkCharcoal = Color.rgb255 0x2E 0x34 0x36
+    , green = Color.rgb255 0x20 0xBF 0x55
+    , lightBlue = Color.rgb255 0xC5 0xE8 0xF7
+    , darkBlue = Color.rgb255 0x1C 0x26 0x66
+    , lightGrey = Color.rgb255 0xE0 0xE0 0xE0
+    , grey = Color.rgb255 0x8D 0x8D 0x8D
+    , googleLogin = Color.rgb255 0x5F 0x63 0x68
+    , orange = Color.rgb255 0xF2 0x64 0x19
+    , red = Color.rgb255 0xAA 0x00 0x00
+    , white = Color.rgb255 0xFF 0xFF 0xFF
+    , black = Color.rgb255 0x00 0x00 0x00
+    }
+
+
+materialPalette : Palette
 materialPalette =
-    Material.defaultPalette
+    { primary = color.lightBlue
+    , secondary = color.turquoise
+    , background = color.white
+    , surface = color.white
+    , error = color.red
+    , on =
+        { primary = color.white
+        , secondary = color.black
+        , background = color.black
+        , surface = color.black
+        , error = color.white
+        }
+    }
 
 
 loginlogoutButtons : ViewState -> List (Button Msg)
@@ -1407,7 +1456,7 @@ viewDemoModeBanner demo =
             , Element.htmlAttribute (Html.Attributes.style "z-index" "10")
             , Element.htmlAttribute (Html.Attributes.style "background" "rgba(0,0,0,0.3)")
             ]
-            [ el [ Font.center, Font.color color.white, width fill, Font.semiBold, paddingXY 0 5 ] <| text "DEMO MODE" ]
+            [ el [ Font.center, width fill, Font.semiBold, paddingXY 0 5 ] <| text "DEMO MODE" ]
 
     else
         Element.none
@@ -1708,20 +1757,11 @@ viewTask model editingNotes =
             , paddingXY 15 0
             , Font.center
             , Border.width 1
-            , Border.color color.darkCharcoal
             , Border.rounded 3
-            , Border.shadow
-                { offset = ( 0, 0.2 )
-                , size = 0.05
-                , blur = 0
-                , color = color.darkCharcoal
-                }
             , Font.family
                 [ Font.typeface "Roboto"
                 , Font.sansSerif
                 ]
-            , Font.color color.darkCharcoal
-            , Background.color color.white
             ]
     in
     case model.editedTask of
@@ -1737,7 +1777,6 @@ viewTask model editingNotes =
                                 [ Element.width Element.fill
                                 , Element.height (Element.px 2)
                                 , Element.centerY
-                                , Background.color color.lightGrey
                                 , Border.rounded 2
                                 ]
                                 Element.none
@@ -1836,6 +1875,54 @@ viewTask model editingNotes =
                                     Just manualPastDueDate
                         )
                         maybeManualPastDueDate
+
+                cadenceOptionToInt : AllYearOrSeasonalOption -> Int
+                cadenceOptionToInt option =
+                    case option of
+                        AllYearOption ->
+                            0
+
+                        SeasonalOption ->
+                            1
+
+                cadenceOptionFromInt : Int -> AllYearOrSeasonalOption
+                cadenceOptionFromInt int =
+                    case int of
+                        0 ->
+                            AllYearOption
+
+                        1 ->
+                            SeasonalOption
+
+                        _ ->
+                            AllYearOption
+
+                cadenceSelect =
+                    Widget.select
+                        { selected = Just (cadenceOptionToInt (getTaskTypeOption task))
+                        , options =
+                            [ AllYearOption, SeasonalOption ]
+                                |> List.map
+                                    (\option ->
+                                        { icon = always Element.none
+                                        , text =
+                                            case option of
+                                                AllYearOption ->
+                                                    "All Year"
+
+                                                SeasonalOption ->
+                                                    "Seasonal"
+                                        }
+                                    )
+                        , onSelect =
+                            \i ->
+                                let
+                                    iCadenceOption : AllYearOrSeasonalOption
+                                    iCadenceOption =
+                                        cadenceOptionFromInt i
+                                in
+                                Just (EditTaskType iCadenceOption)
+                        }
             in
             Element.column [ paddingXY 100 45, spacingXY 0 25 ]
                 [ Input.text []
@@ -1848,18 +1935,12 @@ viewTask model editingNotes =
                     [ button buttonAttrs { label = text "Save", onPress = Just EditTaskSave }
                     , button buttonAttrs { label = text "Cancel", onPress = Just EditTaskCancel }
                     ]
-                , Input.radioRow
-                    [ padding 10
-                    , spacing 20
-                    ]
-                    { onChange = EditTaskType
-                    , selected = Just (getTaskTypeOption task)
-                    , label = Input.labelAbove [ Font.semiBold ] (text "Cadence")
-                    , options =
-                        [ Input.option AllYearOption (text "All Year")
-                        , Input.option SeasonalOption (text "Seasonal")
-                        ]
+                , el [ Font.bold ] (text "Cadence")
+                , Widget.buttonRow
+                    { elementRow = Material.buttonRow
+                    , content = Material.outlinedButton materialPalette
                     }
+                    cadenceSelect
                 , taskTypeInput
                 , case getUnexpiredManualPastDueDate task.manualPastDueDate (getLastCompletedAt task) of
                     Just date ->
@@ -1877,7 +1958,7 @@ viewTask model editingNotes =
                     Nothing ->
                         column []
                             [ el [ Font.bold ] (text "Ignore settings and make past due on")
-                            , el [ Border.width 1, paddingXY 10 10, Border.color color.lightGrey ] <|
+                            , el [ Border.width 1, paddingXY 10 10 ] <|
                                 (DatePicker.view Nothing
                                     { datePickerSettings | placeholder = "Manual past due date" }
                                     model.datePickerForManualPastDue
@@ -1925,7 +2006,7 @@ viewTask model editingNotes =
                 , column []
                     [ el [ Font.bold ] (text "Completion Entries")
                     , el [] (text historicalCadenceMsg)
-                    , el [ Border.width 1, paddingXY 10 10, Border.color color.lightGrey ] <|
+                    , el [ Border.width 1, paddingXY 10 10 ] <|
                         (DatePicker.view Nothing
                             datePickerSettings
                             model.datePicker
@@ -2079,7 +2160,7 @@ radioOption label maybeSortOrder state =
                             rgba255 0x72 0x9F 0xCF 0.1
 
                         Input.Selected ->
-                            color.lightBlue
+                            rgba255 0x72 0x9F 0xCF 0.1
                 ]
                 (case state of
                     Input.Selected ->
@@ -2271,37 +2352,6 @@ viewMain model =
         , viewTaskDiscovery model
         , taskTable
         ]
-
-
-type alias CustomColors =
-    { blue : Element.Color
-    , darkCharcoal : Element.Color
-    , green : Element.Color
-    , lightBlue : Element.Color
-    , darkBlue : Element.Color
-    , lightGrey : Element.Color
-    , orange : Element.Color
-    , red : Element.Color
-    , white : Element.Color
-    , grey : Element.Color
-    , googleLogin : Element.Color
-    }
-
-
-color : CustomColors
-color =
-    { blue = rgb255 0x72 0x9F 0xCF
-    , darkCharcoal = rgb255 0x2E 0x34 0x36
-    , green = rgb255 0x20 0xBF 0x55
-    , lightBlue = rgb255 0xC5 0xE8 0xF7
-    , darkBlue = rgb255 0x1C 0x26 0x66
-    , lightGrey = rgb255 0xE0 0xE0 0xE0
-    , grey = rgb255 0x8D 0x8D 0x8D
-    , googleLogin = rgb255 0x5F 0x63 0x68
-    , orange = rgb255 0xF2 0x64 0x19
-    , red = rgb255 0xAA 0x00 0x00
-    , white = rgb255 0xFF 0xFF 0xFF
-    }
 
 
 viewTaskTable : Date -> List LunarTask -> Element Msg
@@ -2513,7 +2563,7 @@ viewNewTask model =
                 }
             , column []
                 [ el [ Font.bold, paddingXY 0 4 ] (text "Date of Last Completion")
-                , el [ Border.width 1, paddingXY 10 10, Border.color color.lightGrey ] <|
+                , el [ Border.width 1, paddingXY 10 10 ] <|
                     (DatePicker.view (Just model.newTaskCompletedAt)
                         datePickerSettings
                         model.datePicker

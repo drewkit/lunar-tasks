@@ -9,6 +9,7 @@
             "CurrySoftware/elm-datepicker": "4.0.0",
             "Orasund/elm-ui-widgets": "3.4.0",
             "TSFoster/elm-sha1": "2.1.1",
+            "avh4/elm-color": "1.0.0",
             "drewkit/elm-bit-flags": "2.0.0",
             "elm/browser": "1.0.2",
             "elm/core": "1.0.5",
@@ -27,7 +28,6 @@
             "russelldavies/elm-ui-searchbox": "1.1.1"
         },
         "indirect": {
-            "avh4/elm-color": "1.0.0",
             "danfishgold/base64-bytes": "1.1.0",
             "dillonkearns/elm-markdown": "7.0.1",
             "elm/bytes": "1.0.8",
