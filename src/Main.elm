@@ -352,7 +352,7 @@ initWithMaybeNavKey ( currentTimeinMillis, validAuth ) url maybeKey =
         [ loginCmd
         , Time.now |> Task.perform ReceivedCurrentTime
         , Time.here |> Task.perform AdjustTimeZone
-        , Cmd.map NewTaskSetDatePicker datePickerCmd
+        , Cmd.map (\x -> NewTaskEffect (SetDatePicker x)) datePickerCmd
         , Cmd.map EditTaskSetManualPastDueDate datePickerCmdForManualPastDue
         ]
     )
@@ -383,11 +383,7 @@ type Msg
     | SelectSort ListSort
     | ViewChange ViewState
     | MarkCompleted LunarTask Date.Date
-    | CreateTask
-    | NewTaskUpdateTitle String
-    | NewTaskUpdateNotes String
-    | NewTaskUpdatePeriod String
-    | NewTaskSetDatePicker DatePicker.Msg
+    | NewTaskEffect NewTaskMsg
     | EditTaskPeriod String
     | EditSeasonStart Float
     | EditSeasonEnd Float
@@ -429,10 +425,6 @@ update : Msg -> Model -> ( Model, Cmd Msg )
 update msg model =
     let
         -- PORT HELPERS
-        createTask : Encode.Value -> Cmd msg
-        createTask encodedTask =
-            taskAction ( "create", encodedTask )
-
         updateTask : Encode.Value -> Cmd msg
         updateTask encodedTask =
             taskAction ( "update", encodedTask )
@@ -688,6 +680,9 @@ update msg model =
                 , updateTask jsonTaskMarkedCompleted
                 )
 
+        NewTaskEffect newTaskMsg ->
+            updateNewTask newTaskMsg model
+
         EditTask taskId ->
             case findTaskById taskId model.tasks of
                 Nothing ->
@@ -856,36 +851,6 @@ update msg model =
                 Nothing ->
                     ( model, Cmd.none )
 
-        CreateTask ->
-            let
-                encodedJsonTask =
-                    newLunarTaskEncoder model
-
-                modelWithNewTaskReset =
-                    resetNewTask model
-            in
-            if isPresent model.demo then
-                update (TaskUpdated encodedJsonTask) modelWithNewTaskReset
-
-            else
-                ( modelWithNewTaskReset
-                , createTask encodedJsonTask
-                )
-
-        NewTaskUpdateTitle title ->
-            ( { model | newTaskTitle = title }, Cmd.none )
-
-        NewTaskUpdateNotes notes ->
-            ( { model | newTaskNotes = notes }, Cmd.none )
-
-        NewTaskUpdatePeriod rawPeriod ->
-            case String.toInt rawPeriod of
-                Just period ->
-                    ( { model | newTaskPeriod = period }, Cmd.none )
-
-                Nothing ->
-                    ( model, Cmd.none )
-
         EditTaskEnableTag tag ->
             let
                 enableTag =
@@ -1029,27 +994,6 @@ update msg model =
 
             else
                 ( model, deleteTask encodedLunarTask )
-
-        NewTaskSetDatePicker datePickerMsg ->
-            let
-                ( newDatePicker, dateEvent ) =
-                    DatePicker.update datePickerSettings datePickerMsg model.datePicker
-
-                date : Date.Date
-                date =
-                    case dateEvent of
-                        DatePicker.Picked newDate ->
-                            newDate
-
-                        _ ->
-                            model.newTaskCompletedAt
-            in
-            ( { model
-                | newTaskCompletedAt = date
-                , datePicker = newDatePicker
-              }
-            , Cmd.none
-            )
 
         AdjustTimeZone newZone ->
             ( { model | currentZone = newZone }, Cmd.none )
@@ -1334,6 +1278,73 @@ update msg model =
 
         NoOp ->
             ( model, Cmd.none )
+
+
+type NewTaskMsg
+    = UpdateTitle String
+    | UpdateNotes String
+    | UpdatePeriod String
+    | SetDatePicker DatePicker.Msg
+    | Submit
+
+
+updateNewTask : NewTaskMsg -> Model -> ( Model, Cmd Msg )
+updateNewTask newTaskMsg model =
+    case newTaskMsg of
+        UpdateTitle title ->
+            ( { model | newTaskTitle = title }, Cmd.none )
+
+        UpdateNotes notes ->
+            ( { model | newTaskTitle = notes }, Cmd.none )
+
+        UpdatePeriod rawPeriod ->
+            case String.toInt rawPeriod of
+                Just period ->
+                    ( { model | newTaskPeriod = period }, Cmd.none )
+
+                Nothing ->
+                    ( model, Cmd.none )
+
+        SetDatePicker datePickerMsg ->
+            let
+                ( newDatePicker, dateEvent ) =
+                    DatePicker.update datePickerSettings datePickerMsg model.datePicker
+
+                date : Date.Date
+                date =
+                    case dateEvent of
+                        DatePicker.Picked newDate ->
+                            newDate
+
+                        _ ->
+                            model.newTaskCompletedAt
+            in
+            ( { model
+                | newTaskCompletedAt = date
+                , datePicker = newDatePicker
+              }
+            , Cmd.none
+            )
+
+        Submit ->
+            let
+                createTask : Encode.Value -> Cmd msg
+                createTask encodedTask =
+                    taskAction ( "create", encodedTask )
+
+                encodedJsonTask =
+                    newLunarTaskEncoder model
+
+                modelWithNewTaskReset =
+                    resetNewTask model
+            in
+            if isPresent model.demo then
+                update (TaskUpdated encodedJsonTask) modelWithNewTaskReset
+
+            else
+                ( modelWithNewTaskReset
+                , createTask encodedJsonTask
+                )
 
 
 
@@ -2495,7 +2506,7 @@ viewNewTaskCreateBtn : Model -> Element Msg
 viewNewTaskCreateBtn model =
     if newLunarTaskReady model then
         button [ alignBottom, paddingXY 0 5 ]
-            { onPress = Just CreateTask
+            { onPress = Just (NewTaskEffect Submit)
             , label =
                 Icon.plusCircle
                     |> Icon.withSize 2
@@ -2525,19 +2536,19 @@ viewNewTask model =
                 { placeholder = Nothing
                 , label = Input.labelAbove [ Font.bold ] <| text "Title"
                 , text = model.newTaskTitle
-                , onChange = NewTaskUpdateTitle
+                , onChange = \x -> NewTaskEffect (UpdateTitle x)
                 }
             , Input.text []
                 { placeholder = Nothing
                 , label = Input.labelAbove [ Font.bold ] <| text "Cadence (in days)"
                 , text = String.fromInt model.newTaskPeriod
-                , onChange = NewTaskUpdatePeriod
+                , onChange = \x -> NewTaskEffect (UpdatePeriod x)
                 }
             , Input.text []
                 { placeholder = Nothing
                 , label = Input.labelAbove [ Font.bold ] <| text "Notes"
                 , text = model.newTaskNotes
-                , onChange = NewTaskUpdateNotes
+                , onChange = \x -> NewTaskEffect (UpdateNotes x)
                 }
             , column []
                 [ el [ Font.bold, paddingXY 0 4 ] (text "Date of Last Completion")
@@ -2545,7 +2556,7 @@ viewNewTask model =
                     (DatePicker.view (Just model.newTaskCompletedAt)
                         datePickerSettings
                         model.datePicker
-                        |> Html.map NewTaskSetDatePicker
+                        |> Html.map (\x -> NewTaskEffect (SetDatePicker x))
                         |> Element.html
                     )
                 ]
