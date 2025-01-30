@@ -221,7 +221,7 @@ suite =
                         }
 
                     ( updatedModel, _ ) =
-                        update CreateTask demoModel
+                        update (NewTaskEffect NewTaskSubmit) demoModel
                 in
                 Expect.equal 1 (List.length updatedModel.tasks)
         , test "truncates completed entries list to the last 100 entries" <|

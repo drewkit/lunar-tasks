@@ -14,7 +14,7 @@ import Element.Events exposing (onClick)
 import Element.Font as Font
 import Element.Input as Input exposing (OptionState(..), Thumb, button)
 import FeatherIcons as Icon exposing (Icon, key)
-import Html exposing (Html, hr, td, th, tr)
+import Html exposing (Html, address, hr, td, th, tr)
 import Html.Attributes exposing (hidden, style, type_, value)
 import Html.Events exposing (onBlur)
 import Http
@@ -352,8 +352,8 @@ initWithMaybeNavKey ( currentTimeinMillis, validAuth ) url maybeKey =
         [ loginCmd
         , Time.now |> Task.perform ReceivedCurrentTime
         , Time.here |> Task.perform AdjustTimeZone
-        , Cmd.map NewTaskSetDatePicker datePickerCmd
-        , Cmd.map EditTaskSetManualPastDueDate datePickerCmdForManualPastDue
+        , Cmd.map (\x -> NewTaskEffect (SetNewTaskDatePicker x)) datePickerCmd
+        , Cmd.map (\x -> EditTaskEffect (SetManualPastDueDate x)) datePickerCmdForManualPastDue
         ]
     )
 
@@ -382,28 +382,9 @@ type Msg
     | SelectFilter ListFilter
     | SelectSort ListSort
     | ViewChange ViewState
-    | MarkCompleted LunarTask Date.Date
-    | CreateTask
-    | NewTaskUpdateTitle String
-    | NewTaskUpdateNotes String
-    | NewTaskUpdatePeriod String
-    | NewTaskSetDatePicker DatePicker.Msg
-    | EditTaskPeriod String
-    | EditSeasonStart Float
-    | EditSeasonEnd Float
-    | EditTaskDisableTag String
-    | EditTaskEnableTag String
-    | EditTaskRemoveManualPastDueDate
-    | EditTaskSetManualPastDueDate DatePicker.Msg
-    | EditTaskTitle String
-    | EditTaskNotes String
-    | EditTaskRemoveCompletionEntry Date.Date
-    | EditTaskAddCompletionEntry DatePicker.Msg
-    | EditTaskCancel
-    | EditTaskSave
-    | EditTaskType AllYearOrSeasonalOption
-    | EditTask String
-    | EditTaskChangedTagSearchBox (SearchBox.ChangeEvent String)
+    | MarkTaskCompleted LunarTask Date.Date
+    | NewTaskEffect NewTaskMsg
+    | EditTaskEffect EditTaskMsg
     | DeleteTask LunarTask
     | ProcessDownKeys Keyboard.RawKey
     | AdjustTimeZone Time.Zone
@@ -429,14 +410,6 @@ update : Msg -> Model -> ( Model, Cmd Msg )
 update msg model =
     let
         -- PORT HELPERS
-        createTask : Encode.Value -> Cmd msg
-        createTask encodedTask =
-            taskAction ( "create", encodedTask )
-
-        updateTask : Encode.Value -> Cmd msg
-        updateTask encodedTask =
-            taskAction ( "update", encodedTask )
-
         deleteTask : Encode.Value -> Cmd msg
         deleteTask encodedTask =
             taskAction ( "delete", encodedTask )
@@ -675,7 +648,7 @@ update msg model =
         ViewChange viewType ->
             ( { model | view = viewType }, Cmd.none )
 
-        MarkCompleted task entryDate ->
+        MarkTaskCompleted task entryDate ->
             let
                 jsonTaskMarkedCompleted =
                     lunarTaskEncoder <| markTaskCompleted task (Just entryDate)
@@ -684,340 +657,20 @@ update msg model =
                 update (TaskUpdated jsonTaskMarkedCompleted) model
 
             else
+                let
+                    updateTask : Encode.Value -> Cmd Msg
+                    updateTask encodedTask =
+                        taskAction ( "update", encodedTask )
+                in
                 ( model
                 , updateTask jsonTaskMarkedCompleted
                 )
 
-        EditTask taskId ->
-            case findTaskById taskId model.tasks of
-                Nothing ->
-                    ( model, Cmd.none )
+        NewTaskEffect newTaskMsg ->
+            updateNewTask newTaskMsg model
 
-                Just task ->
-                    ( { model | view = LoadedTasksView (EditTaskView False), editedTask = Just task }, Cmd.none )
-
-        EditTaskCancel ->
-            ( { model | editedTask = Nothing, view = LoadedTasksView MainTasksView }, Cmd.none )
-
-        EditTaskSave ->
-            case model.editedTask of
-                Nothing ->
-                    ( model, Cmd.none )
-
-                Just editedTask ->
-                    let
-                        fakeTask : LunarTask
-                        fakeTask =
-                            { title = ""
-                            , notes = ""
-                            , period = 20
-                            , completionEntries = []
-                            , id = "asdfasdf"
-                            , bitTags = 0
-                            , taskOwner = "alksdjflasd"
-                            , taskType = AllYear
-                            , manualPastDueDate = Nothing
-                            }
-
-                        originalTask =
-                            Maybe.withDefault fakeTask (findTaskById editedTask.id model.tasks)
-                    in
-                    if originalTask /= editedTask then
-                        if isPresent model.demo then
-                            update (TaskUpdated (lunarTaskEncoder editedTask))
-                                { model
-                                    | editedTask = Nothing
-                                    , view = LoadedTasksView MainTasksView
-                                }
-
-                        else
-                            ( { model
-                                | editedTask = Nothing
-                                , view = LoadedTasksView MainTasksView
-                              }
-                            , updateTask (lunarTaskEncoder editedTask)
-                            )
-
-                    else
-                        ( { model | editedTask = Nothing, view = LoadedTasksView MainTasksView }, Cmd.none )
-
-        EditTaskRemoveManualPastDueDate ->
-            case model.editedTask of
-                Just task ->
-                    ( { model
-                        | editedTask = Just { task | manualPastDueDate = Nothing }
-                      }
-                    , Cmd.none
-                    )
-
-                Nothing ->
-                    ( model, Cmd.none )
-
-        EditTaskSetManualPastDueDate datePickerMsg ->
-            let
-                ( updatedDatePicker, dateEvent ) =
-                    DatePicker.update datePickerSettings datePickerMsg model.datePickerForManualPastDue
-            in
-            case model.editedTask of
-                Just task ->
-                    case dateEvent of
-                        DatePicker.Picked pickedDate ->
-                            ( { model
-                                | editedTask = Just { task | manualPastDueDate = Just pickedDate }
-                                , datePickerForManualPastDue = updatedDatePicker
-                              }
-                            , Cmd.none
-                            )
-
-                        _ ->
-                            ( { model
-                                | datePickerForManualPastDue = updatedDatePicker
-                              }
-                            , Cmd.none
-                            )
-
-                Nothing ->
-                    ( { model
-                        | datePickerForManualPastDue = updatedDatePicker
-                      }
-                    , Cmd.none
-                    )
-
-        EditTaskType taskTypeOption ->
-            case model.editedTask of
-                Just task ->
-                    case taskTypeOption of
-                        AllYearOption ->
-                            ( { model
-                                | taskTypeOption = taskTypeOption
-                                , editedTask =
-                                    Just { task | taskType = AllYear }
-                              }
-                            , Cmd.none
-                            )
-
-                        SeasonalOption ->
-                            ( { model
-                                | taskTypeOption = taskTypeOption
-                                , editedTask =
-                                    Just { task | taskType = Seasonal 100 200 }
-                              }
-                            , Cmd.none
-                            )
-
-                Nothing ->
-                    ( model, Cmd.none )
-
-        EditTaskRemoveCompletionEntry entryDate ->
-            case model.editedTask of
-                Just task ->
-                    ( { model
-                        | editedTask =
-                            Just
-                                (removeCompletionEntry
-                                    task
-                                    entryDate
-                                )
-                      }
-                    , Cmd.none
-                    )
-
-                Nothing ->
-                    ( model, Cmd.none )
-
-        EditTaskAddCompletionEntry datePickerMsg ->
-            let
-                ( newDatePicker, dateEvent ) =
-                    DatePicker.update datePickerSettings datePickerMsg model.datePicker
-
-                date : Maybe Date.Date
-                date =
-                    case dateEvent of
-                        DatePicker.Picked newDate ->
-                            Just newDate
-
-                        _ ->
-                            Nothing
-            in
-            case model.editedTask of
-                Just task ->
-                    ( { model
-                        | datePicker = newDatePicker
-                        , editedTask =
-                            Just
-                                (markTaskCompleted
-                                    task
-                                    date
-                                )
-                      }
-                    , Cmd.none
-                    )
-
-                Nothing ->
-                    ( model, Cmd.none )
-
-        CreateTask ->
-            let
-                encodedJsonTask =
-                    newLunarTaskEncoder model
-
-                modelWithNewTaskReset =
-                    resetNewTask model
-            in
-            if isPresent model.demo then
-                update (TaskUpdated encodedJsonTask) modelWithNewTaskReset
-
-            else
-                ( modelWithNewTaskReset
-                , createTask encodedJsonTask
-                )
-
-        NewTaskUpdateTitle title ->
-            ( { model | newTaskTitle = title }, Cmd.none )
-
-        NewTaskUpdateNotes notes ->
-            ( { model | newTaskNotes = notes }, Cmd.none )
-
-        NewTaskUpdatePeriod rawPeriod ->
-            case String.toInt rawPeriod of
-                Just period ->
-                    ( { model | newTaskPeriod = period }, Cmd.none )
-
-                Nothing ->
-                    ( model, Cmd.none )
-
-        EditTaskEnableTag tag ->
-            let
-                enableTag =
-                    BitFlags.enableFlag model.tagSettings tag
-            in
-            case model.editedTask of
-                Just task ->
-                    ( { model | editedTask = Just { task | bitTags = enableTag task.bitTags } }, Cmd.none )
-
-                Nothing ->
-                    ( model, Cmd.none )
-
-        EditTaskDisableTag tag ->
-            let
-                disableTag =
-                    BitFlags.disableFlag model.tagSettings tag
-            in
-            case model.editedTask of
-                Just task ->
-                    ( { model | editedTask = Just { task | bitTags = disableTag task.bitTags } }, Cmd.none )
-
-                Nothing ->
-                    ( model, Cmd.none )
-
-        EditTaskTitle titleStr ->
-            case model.editedTask of
-                Just task ->
-                    ( { model | editedTask = Just { task | title = titleStr } }, Cmd.none )
-
-                Nothing ->
-                    ( model, Cmd.none )
-
-        EditTaskNotes notes ->
-            case model.editedTask of
-                Just task ->
-                    ( { model | editedTask = Just { task | notes = notes } }, Cmd.none )
-
-                Nothing ->
-                    ( model, Cmd.none )
-
-        EditTaskPeriod periodString ->
-            let
-                period =
-                    Maybe.withDefault 10 (String.toInt periodString)
-            in
-            case model.editedTask of
-                Just task ->
-                    ( { model | editedTask = Just { task | period = period } }, Cmd.none )
-
-                Nothing ->
-                    ( model, Cmd.none )
-
-        EditSeasonStart seasonStartFloat ->
-            let
-                seasonStart =
-                    floor seasonStartFloat
-            in
-            case model.editedTask of
-                Just task ->
-                    case task.taskType of
-                        AllYear ->
-                            ( model, Cmd.none )
-
-                        Seasonal _ seasonEnd ->
-                            ( { model
-                                | editedTask =
-                                    Just
-                                        { task
-                                            | taskType = Seasonal seasonStart seasonEnd
-                                        }
-                              }
-                            , Cmd.none
-                            )
-
-                Nothing ->
-                    ( model, Cmd.none )
-
-        EditSeasonEnd seasonEndFloat ->
-            let
-                seasonEnd =
-                    floor seasonEndFloat
-            in
-            case model.editedTask of
-                Just task ->
-                    case task.taskType of
-                        AllYear ->
-                            ( model, Cmd.none )
-
-                        Seasonal seasonStart _ ->
-                            ( { model
-                                | editedTask =
-                                    Just
-                                        { task
-                                            | taskType = Seasonal seasonStart seasonEnd
-                                        }
-                              }
-                            , Cmd.none
-                            )
-
-                Nothing ->
-                    ( model, Cmd.none )
-
-        EditTaskChangedTagSearchBox changeEvent ->
-            case changeEvent of
-                SearchBox.SelectionChanged tag ->
-                    case model.editedTask of
-                        Just task ->
-                            ( { model
-                                | editedTask = Just { task | bitTags = BitFlags.enableFlag model.tagSettings tag task.bitTags }
-                                , tagSearchBoxText = ""
-                              }
-                            , Cmd.none
-                            )
-
-                        Nothing ->
-                            ( model, Cmd.none )
-
-                SearchBox.TextChanged text ->
-                    ( { model
-                        | tagSearchBoxSelected = Nothing
-                        , tagSearchBoxText = text
-                        , tagSearchBox = SearchBox.reset model.tagSearchBox
-                      }
-                    , Cmd.none
-                    )
-
-                SearchBox.SearchBoxChanged subMsg ->
-                    ( { model
-                        | tagSearchBox = SearchBox.update subMsg model.tagSearchBox
-                      }
-                    , Cmd.none
-                    )
+        EditTaskEffect editTaskMsg ->
+            updateEditedTask editTaskMsg model
 
         DeleteTask task ->
             let
@@ -1029,27 +682,6 @@ update msg model =
 
             else
                 ( model, deleteTask encodedLunarTask )
-
-        NewTaskSetDatePicker datePickerMsg ->
-            let
-                ( newDatePicker, dateEvent ) =
-                    DatePicker.update datePickerSettings datePickerMsg model.datePicker
-
-                date : Date.Date
-                date =
-                    case dateEvent of
-                        DatePicker.Picked newDate ->
-                            newDate
-
-                        _ ->
-                            model.newTaskCompletedAt
-            in
-            ( { model
-                | newTaskCompletedAt = date
-                , datePicker = newDatePicker
-              }
-            , Cmd.none
-            )
 
         AdjustTimeZone newZone ->
             ( { model | currentZone = newZone }, Cmd.none )
@@ -1334,6 +966,402 @@ update msg model =
 
         NoOp ->
             ( model, Cmd.none )
+
+
+type NewTaskMsg
+    = UpdateNewTaskTitle String
+    | UpdateNewTaskNotes String
+    | UpdateNewTaskPeriod String
+    | SetNewTaskDatePicker DatePicker.Msg
+    | NewTaskSubmit
+
+
+updateNewTask : NewTaskMsg -> Model -> ( Model, Cmd Msg )
+updateNewTask newTaskMsg model =
+    case newTaskMsg of
+        UpdateNewTaskTitle title ->
+            ( { model | newTaskTitle = title }, Cmd.none )
+
+        UpdateNewTaskNotes notes ->
+            ( { model | newTaskTitle = notes }, Cmd.none )
+
+        UpdateNewTaskPeriod rawPeriod ->
+            case String.toInt rawPeriod of
+                Just period ->
+                    ( { model | newTaskPeriod = period }, Cmd.none )
+
+                Nothing ->
+                    ( model, Cmd.none )
+
+        SetNewTaskDatePicker datePickerMsg ->
+            let
+                ( newDatePicker, dateEvent ) =
+                    DatePicker.update datePickerSettings datePickerMsg model.datePicker
+
+                date : Date.Date
+                date =
+                    case dateEvent of
+                        DatePicker.Picked newDate ->
+                            newDate
+
+                        _ ->
+                            model.newTaskCompletedAt
+            in
+            ( { model
+                | newTaskCompletedAt = date
+                , datePicker = newDatePicker
+              }
+            , Cmd.none
+            )
+
+        NewTaskSubmit ->
+            let
+                createTask : Encode.Value -> Cmd msg
+                createTask encodedTask =
+                    taskAction ( "create", encodedTask )
+
+                encodedJsonTask =
+                    newLunarTaskEncoder model
+
+                modelWithNewTaskReset =
+                    resetNewTask model
+            in
+            if isPresent model.demo then
+                update (TaskUpdated encodedJsonTask) modelWithNewTaskReset
+
+            else
+                ( modelWithNewTaskReset
+                , createTask encodedJsonTask
+                )
+
+
+type EditTaskMsg
+    = EditTask String
+    | UpdateEditTaskPeriod String
+    | UpdateEditTaskTitle String
+    | UpdateEditTaskNotes String
+    | UpdateSeasonStart Float
+    | UpdateSeasonEnd Float
+    | UpdateTaskType AllYearOrSeasonalOption
+    | DisableTag String
+    | EnableTag String
+    | RemoveManualPastDueDate
+    | SetManualPastDueDate DatePicker.Msg
+    | RemoveCompletionEntry Date.Date
+    | AddCompletionEntry DatePicker.Msg
+    | ChangedTagSearchBox (SearchBox.ChangeEvent String)
+    | Cancel
+    | Save
+
+
+updateEditedTask : EditTaskMsg -> Model -> ( Model, Cmd Msg )
+updateEditedTask editTaskMsg model =
+    case editTaskMsg of
+        EditTask taskId ->
+            case findTaskById taskId model.tasks of
+                Nothing ->
+                    ( model, Cmd.none )
+
+                Just task ->
+                    ( { model | view = LoadedTasksView (EditTaskView False), editedTask = Just task }, Cmd.none )
+
+        Cancel ->
+            ( { model | editedTask = Nothing, view = LoadedTasksView MainTasksView }, Cmd.none )
+
+        Save ->
+            case model.editedTask of
+                Nothing ->
+                    ( model, Cmd.none )
+
+                Just editedTask ->
+                    let
+                        fakeTask : LunarTask
+                        fakeTask =
+                            { title = ""
+                            , notes = ""
+                            , period = 20
+                            , completionEntries = []
+                            , id = "asdfasdf"
+                            , bitTags = 0
+                            , taskOwner = "alksdjflasd"
+                            , taskType = AllYear
+                            , manualPastDueDate = Nothing
+                            }
+
+                        originalTask =
+                            Maybe.withDefault fakeTask (findTaskById editedTask.id model.tasks)
+                    in
+                    if originalTask /= editedTask then
+                        if isPresent model.demo then
+                            update (TaskUpdated (lunarTaskEncoder editedTask))
+                                { model
+                                    | editedTask = Nothing
+                                    , view = LoadedTasksView MainTasksView
+                                }
+
+                        else
+                            let
+                                updateTask : Encode.Value -> Cmd Msg
+                                updateTask encodedTask =
+                                    taskAction ( "update", encodedTask )
+                            in
+                            ( { model
+                                | editedTask = Nothing
+                                , view = LoadedTasksView MainTasksView
+                              }
+                            , updateTask (lunarTaskEncoder editedTask)
+                            )
+
+                    else
+                        ( { model | editedTask = Nothing, view = LoadedTasksView MainTasksView }, Cmd.none )
+
+        RemoveManualPastDueDate ->
+            case model.editedTask of
+                Just task ->
+                    ( { model
+                        | editedTask = Just { task | manualPastDueDate = Nothing }
+                      }
+                    , Cmd.none
+                    )
+
+                Nothing ->
+                    ( model, Cmd.none )
+
+        SetManualPastDueDate datePickerMsg ->
+            let
+                ( updatedDatePicker, dateEvent ) =
+                    DatePicker.update datePickerSettings datePickerMsg model.datePickerForManualPastDue
+            in
+            case model.editedTask of
+                Just task ->
+                    case dateEvent of
+                        DatePicker.Picked pickedDate ->
+                            ( { model
+                                | editedTask = Just { task | manualPastDueDate = Just pickedDate }
+                                , datePickerForManualPastDue = updatedDatePicker
+                              }
+                            , Cmd.none
+                            )
+
+                        _ ->
+                            ( { model
+                                | datePickerForManualPastDue = updatedDatePicker
+                              }
+                            , Cmd.none
+                            )
+
+                Nothing ->
+                    ( { model
+                        | datePickerForManualPastDue = updatedDatePicker
+                      }
+                    , Cmd.none
+                    )
+
+        UpdateTaskType taskTypeOption ->
+            case model.editedTask of
+                Just task ->
+                    case taskTypeOption of
+                        AllYearOption ->
+                            ( { model
+                                | taskTypeOption = taskTypeOption
+                                , editedTask =
+                                    Just { task | taskType = AllYear }
+                              }
+                            , Cmd.none
+                            )
+
+                        SeasonalOption ->
+                            ( { model
+                                | taskTypeOption = taskTypeOption
+                                , editedTask =
+                                    Just { task | taskType = Seasonal 100 200 }
+                              }
+                            , Cmd.none
+                            )
+
+                Nothing ->
+                    ( model, Cmd.none )
+
+        RemoveCompletionEntry entryDate ->
+            case model.editedTask of
+                Just task ->
+                    ( { model
+                        | editedTask =
+                            Just
+                                (removeCompletionEntry
+                                    task
+                                    entryDate
+                                )
+                      }
+                    , Cmd.none
+                    )
+
+                Nothing ->
+                    ( model, Cmd.none )
+
+        AddCompletionEntry datePickerMsg ->
+            let
+                ( newDatePicker, dateEvent ) =
+                    DatePicker.update datePickerSettings datePickerMsg model.datePicker
+
+                date : Maybe Date.Date
+                date =
+                    case dateEvent of
+                        DatePicker.Picked newDate ->
+                            Just newDate
+
+                        _ ->
+                            Nothing
+            in
+            case model.editedTask of
+                Just task ->
+                    ( { model
+                        | datePicker = newDatePicker
+                        , editedTask =
+                            Just
+                                (markTaskCompleted
+                                    task
+                                    date
+                                )
+                      }
+                    , Cmd.none
+                    )
+
+                Nothing ->
+                    ( model, Cmd.none )
+
+        EnableTag tag ->
+            let
+                enableTag =
+                    BitFlags.enableFlag model.tagSettings tag
+            in
+            case model.editedTask of
+                Just task ->
+                    ( { model | editedTask = Just { task | bitTags = enableTag task.bitTags } }, Cmd.none )
+
+                Nothing ->
+                    ( model, Cmd.none )
+
+        DisableTag tag ->
+            let
+                disableTag =
+                    BitFlags.disableFlag model.tagSettings tag
+            in
+            case model.editedTask of
+                Just task ->
+                    ( { model | editedTask = Just { task | bitTags = disableTag task.bitTags } }, Cmd.none )
+
+                Nothing ->
+                    ( model, Cmd.none )
+
+        UpdateEditTaskTitle titleStr ->
+            case model.editedTask of
+                Just task ->
+                    ( { model | editedTask = Just { task | title = titleStr } }, Cmd.none )
+
+                Nothing ->
+                    ( model, Cmd.none )
+
+        UpdateEditTaskNotes notes ->
+            case model.editedTask of
+                Just task ->
+                    ( { model | editedTask = Just { task | notes = notes } }, Cmd.none )
+
+                Nothing ->
+                    ( model, Cmd.none )
+
+        UpdateEditTaskPeriod periodString ->
+            let
+                period =
+                    Maybe.withDefault 10 (String.toInt periodString)
+            in
+            case model.editedTask of
+                Just task ->
+                    ( { model | editedTask = Just { task | period = period } }, Cmd.none )
+
+                Nothing ->
+                    ( model, Cmd.none )
+
+        UpdateSeasonStart seasonStartFloat ->
+            let
+                seasonStart =
+                    floor seasonStartFloat
+            in
+            case model.editedTask of
+                Just task ->
+                    case task.taskType of
+                        AllYear ->
+                            ( model, Cmd.none )
+
+                        Seasonal _ seasonEnd ->
+                            ( { model
+                                | editedTask =
+                                    Just
+                                        { task
+                                            | taskType = Seasonal seasonStart seasonEnd
+                                        }
+                              }
+                            , Cmd.none
+                            )
+
+                Nothing ->
+                    ( model, Cmd.none )
+
+        UpdateSeasonEnd seasonEndFloat ->
+            let
+                seasonEnd =
+                    floor seasonEndFloat
+            in
+            case model.editedTask of
+                Just task ->
+                    case task.taskType of
+                        AllYear ->
+                            ( model, Cmd.none )
+
+                        Seasonal seasonStart _ ->
+                            ( { model
+                                | editedTask =
+                                    Just
+                                        { task
+                                            | taskType = Seasonal seasonStart seasonEnd
+                                        }
+                              }
+                            , Cmd.none
+                            )
+
+                Nothing ->
+                    ( model, Cmd.none )
+
+        ChangedTagSearchBox changeEvent ->
+            case changeEvent of
+                SearchBox.SelectionChanged tag ->
+                    case model.editedTask of
+                        Just task ->
+                            ( { model
+                                | editedTask = Just { task | bitTags = BitFlags.enableFlag model.tagSettings tag task.bitTags }
+                                , tagSearchBoxText = ""
+                              }
+                            , Cmd.none
+                            )
+
+                        Nothing ->
+                            ( model, Cmd.none )
+
+                SearchBox.TextChanged text ->
+                    ( { model
+                        | tagSearchBoxSelected = Nothing
+                        , tagSearchBoxText = text
+                        , tagSearchBox = SearchBox.reset model.tagSearchBox
+                      }
+                    , Cmd.none
+                    )
+
+                SearchBox.SearchBoxChanged subMsg ->
+                    ( { model
+                        | tagSearchBox = SearchBox.update subMsg model.tagSearchBox
+                      }
+                    , Cmd.none
+                    )
 
 
 
@@ -1716,7 +1744,7 @@ viewTask model editingNotes =
                         , Element.paddingEach { top = 0, bottom = 160, left = 0, right = 0 }
                         ]
                         { label = Input.labelHidden "notes"
-                        , onChange = EditTaskNotes
+                        , onChange = \x -> EditTaskEffect (UpdateEditTaskNotes x)
                         , text = notes
                         , spellcheck = True
                         , placeholder = Nothing
@@ -1804,7 +1832,7 @@ viewTask model editingNotes =
                                         [ Font.semiBold
                                         ]
                                         (text "Period (in days)")
-                                , onChange = EditTaskPeriod
+                                , onChange = \x -> EditTaskEffect (UpdateEditTaskPeriod x)
                                 , text = String.fromInt task.period
                                 , placeholder = Nothing
                                 }
@@ -1838,17 +1866,17 @@ viewTask model editingNotes =
                                             [ Font.semiBold
                                             ]
                                             (text "Period (in days)")
-                                    , onChange = EditTaskPeriod
+                                    , onChange = \x -> EditTaskEffect (UpdateEditTaskPeriod x)
                                     , text = String.fromInt task.period
                                     , placeholder = Nothing
                                     }
                                 , buildSeasonalSliderInput
                                     seasonStart
-                                    EditSeasonStart
+                                    (\x -> EditTaskEffect (UpdateSeasonStart x))
                                     "Season Start Date"
                                 , buildSeasonalSliderInput
                                     seasonEnd
-                                    EditSeasonEnd
+                                    (\x -> EditTaskEffect (UpdateSeasonEnd x))
                                     "Season End Date"
                                 , el [] (text <| seasonMessage)
                                 ]
@@ -1880,19 +1908,19 @@ viewTask model editingNotes =
             Element.column [ paddingXY 100 45, spacingXY 0 25 ]
                 [ Input.text []
                     { label = Input.labelAbove [ Font.semiBold ] (text "Title")
-                    , onChange = EditTaskTitle
+                    , onChange = \x -> EditTaskEffect (UpdateEditTaskTitle x)
                     , text = task.title
                     , placeholder = Nothing
                     }
                 , row [ spacingXY 15 0 ]
-                    [ button buttonAttrs { label = text "Save", onPress = Just EditTaskSave }
-                    , button buttonAttrs { label = text "Cancel", onPress = Just EditTaskCancel }
+                    [ button buttonAttrs { label = text "Save", onPress = Just (EditTaskEffect Save) }
+                    , button buttonAttrs { label = text "Cancel", onPress = Just (EditTaskEffect Cancel) }
                     ]
                 , Input.radioRow
                     [ padding 10
                     , spacing 20
                     ]
-                    { onChange = EditTaskType
+                    { onChange = \x -> EditTaskEffect (UpdateTaskType x)
                     , selected = Just (getTaskTypeOption task)
                     , label = Input.labelAbove [ Font.semiBold ] (text "Cadence")
                     , options =
@@ -1907,7 +1935,7 @@ viewTask model editingNotes =
                             [ el [ Font.bold ] (text <| "Task is manually set to be past due on " ++ Date.toIsoString date)
                             , text " -- "
                             , button []
-                                { onPress = Just EditTaskRemoveManualPastDueDate
+                                { onPress = Just (EditTaskEffect RemoveManualPastDueDate)
                                 , label = Icon.trash2 |> Icon.toHtml [] |> Element.html
                                 }
                             ]
@@ -1919,7 +1947,7 @@ viewTask model editingNotes =
                                 (DatePicker.view Nothing
                                     { datePickerSettings | placeholder = "Manual past due date" }
                                     model.datePickerForManualPastDue
-                                    |> Html.map EditTaskSetManualPastDueDate
+                                    |> Html.map (\x -> EditTaskEffect (SetManualPastDueDate x))
                                     |> Element.html
                                 )
                             ]
@@ -1939,7 +1967,7 @@ viewTask model editingNotes =
                 , column []
                     [ el [ Font.bold ] (text "Tags")
                     , SearchBox.input []
-                        { onChange = EditTaskChangedTagSearchBox
+                        { onChange = \x -> EditTaskEffect (ChangedTagSearchBox x)
                         , text = model.tagSearchBoxText
                         , filter =
                             \query optionStr ->
@@ -1966,7 +1994,7 @@ viewTask model editingNotes =
                         (DatePicker.view Nothing
                             datePickerSettings
                             model.datePicker
-                            |> Html.map EditTaskAddCompletionEntry
+                            |> Html.map (\x -> EditTaskEffect (AddCompletionEntry x))
                             |> Element.html
                         )
                     , Element.column [ spacingXY 0 15, paddingXY 0 15 ] (viewCompletionEntries task)
@@ -1986,7 +2014,7 @@ enabledFlagEntryToListedItem flag =
         [ text flag
         , text " -- "
         , button []
-            { onPress = Just (EditTaskDisableTag flag)
+            { onPress = Just <| EditTaskEffect <| DisableTag flag
             , label = Icon.trash2 |> Icon.toHtml [] |> Element.html
             }
         ]
@@ -2003,7 +2031,7 @@ completedEntryToListedItem entryTime =
     Element.row []
         [ text (Date.toIsoString entryTime ++ " -- ")
         , button []
-            { onPress = Just (EditTaskRemoveCompletionEntry entryTime)
+            { onPress = Just <| EditTaskEffect <| RemoveCompletionEntry entryTime
             , label = Icon.trash2 |> Icon.toHtml [] |> Element.html
             }
         ]
@@ -2365,7 +2393,7 @@ viewTaskTable currentDate tasks =
                     tr []
                         [ td
                             [ Html.Attributes.style "cursor" "pointer"
-                            , Html.Events.onClick (EditTask task.id)
+                            , Html.Events.onClick (EditTaskEffect (EditTask task.id))
                             , Html.Attributes.class "embolden"
                             , Html.Attributes.title task.notes
                             ]
@@ -2378,7 +2406,7 @@ viewTaskTable currentDate tasks =
                             [ Html.Attributes.style "cursor" "pointer"
                             , Html.Attributes.style "text-align" "center"
                             , Html.Attributes.class "embolden"
-                            , Html.Events.onClick (MarkCompleted task currentDate)
+                            , Html.Events.onClick (MarkTaskCompleted task currentDate)
                             ]
                             [ Html.div
                                 [ Html.Attributes.class "selective-icon-opts"
@@ -2495,7 +2523,7 @@ viewNewTaskCreateBtn : Model -> Element Msg
 viewNewTaskCreateBtn model =
     if newLunarTaskReady model then
         button [ alignBottom, paddingXY 0 5 ]
-            { onPress = Just CreateTask
+            { onPress = Just (NewTaskEffect NewTaskSubmit)
             , label =
                 Icon.plusCircle
                     |> Icon.withSize 2
@@ -2525,19 +2553,19 @@ viewNewTask model =
                 { placeholder = Nothing
                 , label = Input.labelAbove [ Font.bold ] <| text "Title"
                 , text = model.newTaskTitle
-                , onChange = NewTaskUpdateTitle
+                , onChange = \x -> NewTaskEffect (UpdateNewTaskTitle x)
                 }
             , Input.text []
                 { placeholder = Nothing
                 , label = Input.labelAbove [ Font.bold ] <| text "Cadence (in days)"
                 , text = String.fromInt model.newTaskPeriod
-                , onChange = NewTaskUpdatePeriod
+                , onChange = \x -> NewTaskEffect (UpdateNewTaskPeriod x)
                 }
             , Input.text []
                 { placeholder = Nothing
                 , label = Input.labelAbove [ Font.bold ] <| text "Notes"
                 , text = model.newTaskNotes
-                , onChange = NewTaskUpdateNotes
+                , onChange = \x -> NewTaskEffect (UpdateNewTaskNotes x)
                 }
             , column []
                 [ el [ Font.bold, paddingXY 0 4 ] (text "Date of Last Completion")
@@ -2545,7 +2573,7 @@ viewNewTask model =
                     (DatePicker.view (Just model.newTaskCompletedAt)
                         datePickerSettings
                         model.datePicker
-                        |> Html.map NewTaskSetDatePicker
+                        |> Html.map (\x -> NewTaskEffect (SetNewTaskDatePicker x))
                         |> Element.html
                     )
                 ]
