@@ -25,13 +25,12 @@ module LunarTask exposing
     , removeCompletionEntry
     )
 
-import Date exposing (Date, Interval(..), Unit(..))
-import Html exposing (th)
+import Date exposing (Interval(..), Unit(..))
 import Http exposing (task)
 import Json.Decode as Decode exposing (Decoder, field, int, map2, oneOf, string)
 import Json.Decode.Extra exposing (andMap)
 import Json.Encode as Encode
-import List exposing (length)
+import List
 
 
 type alias SeasonStart =

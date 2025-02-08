@@ -5,8 +5,10 @@
     "elmPackages.elm-doc-preview@latest",
     "elmPackages.elm-format@latest",
     "elmPackages.elm-test@latest",
-    "elmPackages.elm-live@latest"
+    "elmPackages.elm-live@latest",
+    "aider-chat@latest"
   ],
+  "env_from": "SECRETS.env",
   "shell": {
     "init_hook": [
       "echo 'Welcome to devbox!' > /dev/null"
