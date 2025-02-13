@@ -689,8 +689,10 @@ update msg model =
             in
             ( { model | savedViews = updatedSavedViews }
                 |> setSavedView defaultSavedView
-            , Cmd.none
+            , []
             )
+                |> maybeUpdateQueryParams
+                |> batchCmdList
 
         SavedViewRemoved _ ->
             ( model, Cmd.none )
@@ -714,8 +716,10 @@ update msg model =
                 Just savedView ->
                     ( model
                         |> setSavedView savedView
-                    , Cmd.none
+                    , []
                     )
+                        |> maybeUpdateQueryParams
+                        |> batchCmdList
 
         SavedViewEditTitle previousTitle ->
             ( { model
