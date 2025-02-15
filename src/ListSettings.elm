@@ -78,6 +78,13 @@ currentViewIsSavedView ls =
         ls.savedViews
 
 
+getSavedViewName : SavedView -> String
+getSavedViewName savedView =
+    Maybe.withDefault
+        (Maybe.withDefault "SAVED VIEW" savedView.searchTerm)
+        savedView.title
+
+
 type alias ListSettings r =
     { r
         | filter : ListFilter

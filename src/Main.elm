@@ -275,7 +275,7 @@ savedViewDropdownConfig : Dropdown.Config SavedView Msg Model
 savedViewDropdownConfig =
     let
         itemToTitle item =
-            Maybe.withDefault (Maybe.withDefault "SAVED VIEW" item.searchTerm) item.title
+            getSavedViewName item
                 |> String.pad 20 ' '
     in
     Dropdown.basic

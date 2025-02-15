@@ -54,7 +54,27 @@ suite =
             fallOrdinal
     in
     describe "Lunar Tasks"
-        [ describe "when the manual past due date is set"
+        [ describe "Saved Views"
+            [ test "will ensure unique title on update/create events" <|
+                \_ ->
+                    let
+                        savedView =
+                            currentView { testModel | searchTerm = Just "wash" }
+
+                        ( testModelOne, _ ) =
+                            update SavedViewAdd
+                                { testModel
+                                    | savedViews = [ savedView ]
+                                    , demo = Just { demoId = 1 }
+                                }
+                    in
+                    Expect.equal
+                        (List.member { savedView | title = Just "wash (1)" }
+                            testModelOne.savedViews
+                        )
+                        True
+            ]
+        , describe "when the manual past due date is set"
             [ test "the past due state of task can be pushed back to a later date" <|
                 \_ ->
                     let
