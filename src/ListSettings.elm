@@ -67,8 +67,24 @@ findMatchingSavedView currentSavedView savedViews =
 
 
 currentView : ListSettings r -> SavedView
-currentView { filter, sort, tagsSelected, searchTerm } =
-    SavedView filter sort tagsSelected searchTerm Nothing
+currentView ls =
+    let
+        savedViewPlaceholder =
+            SavedView ls.filter ls.sort ls.tagsSelected ls.searchTerm Nothing
+    in
+    case findMatchingSavedView savedViewPlaceholder ls.savedViews of
+        Just savedView ->
+            savedView
+
+        Nothing ->
+            let
+                placeholderName =
+                    genUniqueSavedViewName ls (getSavedViewName savedViewPlaceholder)
+
+                savedViewPlaceholderWithUniqueName =
+                    { savedViewPlaceholder | title = Just placeholderName }
+            in
+            savedViewPlaceholderWithUniqueName
 
 
 currentViewIsSavedView : ListSettings r -> Bool
@@ -83,6 +99,32 @@ getSavedViewName savedView =
     Maybe.withDefault
         (Maybe.withDefault "SAVED VIEW" savedView.searchTerm)
         savedView.title
+
+
+genUniqueSavedViewName : ListSettings r -> String -> String
+genUniqueSavedViewName ls savedViewName =
+    let
+        savedViewNames =
+            List.map (\x -> getSavedViewName x) ls.savedViews
+    in
+    if List.member savedViewName savedViewNames then
+        recurGenUniqueSavedViewName 1 savedViewNames savedViewName
+
+    else
+        savedViewName
+
+
+recurGenUniqueSavedViewName : Int -> List String -> String -> String
+recurGenUniqueSavedViewName count savedViewNames savedViewName =
+    let
+        iteratedSavedViewName =
+            savedViewName ++ " (" ++ String.fromInt count ++ ")"
+    in
+    if List.member iteratedSavedViewName savedViewNames then
+        recurGenUniqueSavedViewName (count + 1) savedViewNames savedViewName
+
+    else
+        iteratedSavedViewName
 
 
 type alias ListSettings r =

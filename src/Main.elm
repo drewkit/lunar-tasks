@@ -744,7 +744,7 @@ update msg model =
                         model.savedViews
 
                 newTitle =
-                    model.savedViewTitleInput
+                    genUniqueSavedViewName model model.savedViewTitleInput
             in
             ( { model
                 | savedViewTitleInput = ""

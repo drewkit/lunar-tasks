@@ -65,14 +65,17 @@ suite =
                             update SavedViewAdd
                                 { testModel
                                     | savedViews = [ savedView ]
+                                    , searchTerm = Just "wash"
                                     , demo = Just { demoId = 1 }
+                                    , filter = FilterNonPastDue
                                 }
                     in
-                    Expect.equal
-                        (List.member { savedView | title = Just "wash (1)" }
-                            testModelOne.savedViews
-                        )
-                        True
+                    case List.head testModelOne.savedViews of
+                        Nothing ->
+                            Expect.fail "no saved view found"
+
+                        Just sv ->
+                            Expect.equal sv.title (Just "wash (1)")
             ]
         , describe "when the manual past due date is set"
             [ test "the past due state of task can be pushed back to a later date" <|
