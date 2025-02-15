@@ -286,6 +286,13 @@ savedViewDropdownConfig =
         , itemToPrompt = \savedView -> el [] (text <| itemToTitle savedView)
         , itemToElement = \_ _ savedView -> el [] (text <| itemToTitle savedView)
         }
+        |> Dropdown.withListAttributes
+            [ Border.solid
+            , Border.color color.grey
+            , Border.width 1
+            , Background.color color.white
+            ]
+        |> Dropdown.withPromptElement (el [] <| text "-- Saved Views --")
 
 
 
