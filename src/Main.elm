@@ -11,13 +11,13 @@ import Dropdown exposing (..)
 import Element exposing (..)
 import Element.Background as Background
 import Element.Border as Border
-import Element.Events exposing (onClick)
+import Element.Events exposing (onClick, onMouseEnter)
 import Element.Font as Font
 import Element.Input as Input exposing (OptionState(..), button)
 import FeatherIcons as Icon exposing (Icon, key)
 import Html exposing (Html, td, th, tr)
 import Html.Attributes exposing (style, type_, value)
-import Html.Events
+import Html.Events exposing (onMouseOver)
 import Http
 import Json.Decode as Decode exposing (Decoder, errorToString)
 import Json.Encode as Encode
@@ -293,6 +293,7 @@ savedViewDropdownConfig =
             , Background.color color.white
             ]
         |> Dropdown.withPromptElement (el [] <| text "-- Saved Views --")
+        |> Dropdown.withContainerAttributes [ pointer ]
 
 
 
@@ -2342,12 +2343,11 @@ viewTaskDiscovery model =
                 , label = Input.labelHidden "search"
                 }
 
+        currentViewisDefaultView =
+            savedViewMatch defaultSavedView (currentView model)
+
         saveViewBtn =
             if not <| currentViewIsSavedView model then
-                let
-                    currentViewisDefaultView =
-                        savedViewMatch defaultSavedView (currentView model)
-                in
                 button
                     [ centerY
                     , transparent currentViewisDefaultView
@@ -2471,6 +2471,18 @@ viewTaskDiscovery model =
 
                 _ ->
                     row [] [ row [ Border.width 1 ] [ savedViewDropdown ], saveViewBtn ]
+
+        resetRow =
+            row
+                [ transparent currentViewisDefaultView
+                ]
+                [ el
+                    [ onClick (SavedViewSelection <| Just defaultSavedView)
+                    , pointer
+                    ]
+                  <|
+                    text "(x) reset all selections"
+                ]
     in
     column [ spacingXY 0 15 ]
         [ filterRow
@@ -2481,6 +2493,7 @@ viewTaskDiscovery model =
             ]
         , tagsRow
         , savedViewsRow
+        , resetRow
         ]
 
 
