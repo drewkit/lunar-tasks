@@ -696,7 +696,6 @@ update msg model =
                         model.savedViews
             in
             ( { model | savedViews = updatedSavedViews }
-                |> setSavedView defaultSavedView
             , []
             )
                 |> maybeUpdateQueryParams
