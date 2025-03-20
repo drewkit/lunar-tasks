@@ -461,8 +461,42 @@ type Msg
 
 
 update : Msg -> Model -> ( Model, Cmd Msg )
-update msg model =
+update msg rawModel =
     let
+        -- MIDDLEWARE LOGIC
+        model : Model
+        model =
+            rawModel
+                |> userAbortedSavedViewTitleUpdate
+
+        userAbortedSavedViewTitleUpdate : Model -> Model
+        userAbortedSavedViewTitleUpdate m =
+            case m.view of
+                LoadedTasksView loadedTasksViewType ->
+                    case loadedTasksViewType of
+                        MainTasksView EditSavedViewTitle ->
+                            case msg of
+                                SavedViewUpdateTitle ->
+                                    m
+
+                                SavedViewUpdateTitleInput _ ->
+                                    m
+
+                                ProcessDownKeys _ ->
+                                    m
+
+                                ReceivedCurrentTime _ ->
+                                    m
+
+                                _ ->
+                                    { m | view = LoadedTasksView (MainTasksView Normal) }
+
+                        _ ->
+                            m
+
+                _ ->
+                    m
+
         -- PORT HELPERS
         deleteTask : Encode.Value -> Cmd msg
         deleteTask encodedTask =
@@ -523,7 +557,7 @@ update msg model =
                 timeSinceLastCacheCheck =
                     Time.posixToMillis m.receivedCurrentTimeAt - Time.posixToMillis m.lastCacheCheckAt
             in
-            -- fetch cache digest every X minutes
+            -- fetch current cache digest record on backend every X minutes
             if timeSinceLastCacheCheck > (minutes * 60000) && not (isPresent m.demo) then
                 ( m, fetchCacheDigest :: lc )
 
