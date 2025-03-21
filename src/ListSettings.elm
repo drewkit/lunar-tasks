@@ -3,6 +3,8 @@ module ListSettings exposing (..)
 import BitFlags
 import Date
 import Dict
+import Json.Decode as Decode exposing (Decoder, errorToString)
+import Json.Encode as Encode
 import LunarTask exposing (..)
 import Set exposing (Set)
 import Url exposing (Url)
@@ -18,6 +20,131 @@ type alias SavedView =
     , searchTerm : Maybe String
     , title : Maybe String
     }
+
+
+savedViewEncoder : SavedView -> Encode.Value
+savedViewEncoder savedView =
+    let
+        ( listSortType, listSortOrder ) =
+            sortToStr savedView.sort
+    in
+    Encode.object
+        [ ( "filter", Encode.string (filterToStr savedView.filter) )
+        , ( "sortType", Encode.string listSortType )
+        , ( "sortOrder", Encode.string listSortOrder )
+        , ( "tagsWhitelisted", Encode.int (Tuple.first savedView.tagsSelected) )
+        , ( "tagsBlacklisted", Encode.int (Tuple.second savedView.tagsSelected) )
+        , ( "searchTerm", Encode.string (Maybe.withDefault "" savedView.searchTerm) )
+        , ( "title", Encode.string (Maybe.withDefault "" savedView.title) )
+        ]
+
+
+filterToStr : ListFilter -> String
+filterToStr filter =
+    filterToQueryParam filter
+
+
+sortToStr : ListSort -> ( String, String )
+sortToStr listSort =
+    listSortToQueryParam listSort
+
+
+savedViewDecoder : Decoder SavedView
+savedViewDecoder =
+    Decode.map7
+        (\listFilter whitelistTags blacklistTags title searchTerm sortType sortOrder ->
+            SavedView
+                listFilter
+                (strToListSort sortOrder sortType)
+                ( whitelistTags, blacklistTags )
+                (Just searchTerm)
+                (Just title)
+        )
+        (Decode.field "filter" listFilterDecoder)
+        (Decode.field "tagsWhitelisted" Decode.int)
+        (Decode.field "tagsBlacklisted" Decode.int)
+        (Decode.field "title" Decode.string)
+        (Decode.field "searchTerm" Decode.string)
+        (Decode.field "sortType" Decode.string)
+        (Decode.field "sortOrder" sortOrderDecoder)
+
+
+listFilterDecoder : Decoder ListFilter
+listFilterDecoder =
+    Decode.map strToListFilter Decode.string
+
+
+strToListFilter : String -> ListFilter
+strToListFilter str =
+    case str of
+        "pastdue" ->
+            FilterPastDue
+
+        "nonpastdue" ->
+            FilterNonPastDue
+
+        "all" ->
+            FilterAll
+
+        -- not in use
+        "filterpastduebydays" ->
+            FilterPastDueByDays 1
+
+        -- not in use
+        "filterpastduebyperiods" ->
+            FilterPastDueByPeriods 1
+
+        _ ->
+            FilterAll
+
+
+sortOrderDecoder : Decoder SortOrder
+sortOrderDecoder =
+    Decode.string
+        |> Decode.map
+            (\str ->
+                case str of
+                    "asc" ->
+                        ASC
+
+                    "desc" ->
+                        DESC
+
+                    _ ->
+                        ASC
+            )
+
+
+strToSortOrder : String -> SortOrder
+strToSortOrder str =
+    case str of
+        "asc" ->
+            ASC
+
+        "desc" ->
+            DESC
+
+        _ ->
+            ASC
+
+
+strToListSort : SortOrder -> String -> ListSort
+strToListSort sortOrder str =
+    case str of
+        "days" ->
+            SortPastDueDays sortOrder
+
+        "period" ->
+            SortPastDuePeriods sortOrder
+
+        "lastcompleted" ->
+            SortLastCompleted sortOrder
+
+        "createdat" ->
+            NoSort sortOrder
+
+        _ ->
+            NoSort sortOrder
 
 
 defaultSavedView : SavedView
