@@ -7,18 +7,19 @@ import Browser.Events exposing (Visibility(..), onVisibilityChange)
 import Browser.Navigation as Nav
 import Date exposing (Date, Unit(..))
 import DatePicker exposing (defaultSettings)
+import Dropdown exposing (..)
 import Element exposing (..)
 import Element.Background as Background
 import Element.Border as Border
-import Element.Events exposing (onClick)
+import Element.Events exposing (onClick, onMouseEnter)
 import Element.Font as Font
 import Element.Input as Input exposing (OptionState(..), button)
 import FeatherIcons as Icon exposing (Icon, key)
 import Html exposing (Html, td, th, tr)
 import Html.Attributes exposing (style, type_, value)
-import Html.Events
+import Html.Events exposing (onMouseOver)
 import Http
-import Json.Decode as Decode exposing (Decoder, errorToString)
+import Json.Decode as Decode exposing (Decoder, errorToString, maybe)
 import Json.Encode as Encode
 import Keyboard exposing (Key(..))
 import List
@@ -29,7 +30,7 @@ import NewLunarTask exposing (..)
 import Process
 import SHA1
 import SearchBox
-import Set exposing (Set)
+import Set
 import Task
 import Time exposing (utc)
 import Url exposing (Url)
@@ -98,8 +99,14 @@ type alias Model =
     , currentZone : Time.Zone
     , filter : ListFilter
     , sort : ListSort
-    , tagsSelected : ( Set String, Set String )
+    , tagsSelected : ( Int, Int )
     , searchTerm : Maybe String
+    , savedViews : List SavedView
+    , savedViewDropdownState : Dropdown.State SavedView
+    , savedViewTitleInput : String
+    , tagResourcesLoaded : Bool
+    , savedViewResourcesLoaded : Bool
+    , listSettingsAlreadyInitializedFromQueryParams : Bool
     , view : ViewState
     , newTaskTitle : String
     , newTaskNotes : String
@@ -117,8 +124,8 @@ type alias Model =
     , tagSearchBox : SearchBox.State
     , tagSearchBoxText : String
     , tagSearchBoxSelected : Maybe String
-    , tagResourcesLoaded : Bool
     , lastCacheCheckAt : Time.Posix
+    , cacheDigestChangedCount : Int
     , receivedCurrentTimeAt : Time.Posix
     }
 
@@ -127,9 +134,14 @@ type alias EditingNotes =
     Bool
 
 
+type MainTaskViewModes
+    = Normal
+    | EditSavedViewTitle
+
+
 type LoadedTasksViewState
     = JsonExportView
-    | MainTasksView
+    | MainTasksView MainTaskViewModes
     | EditTaskView EditingNotes
     | TagSettingsView (Maybe String)
 
@@ -149,17 +161,19 @@ type alias LocalStore =
     { tasks : List LunarTask
     , taskOwner : String
     , bitFlags : BitFlagSettings
+    , savedViews : List SavedView
     }
 
 
 localStoreDecoder : Decoder LocalStore
 localStoreDecoder =
-    Decode.map3 LocalStore
+    Decode.map4 LocalStore
         (Decode.field "tasks" (Decode.list lunarTaskDecoder))
         (Decode.field "taskOwner" Decode.string)
         (Decode.field "bitFlags" (Decode.list Decode.string)
             |> Decode.map (\l -> Result.withDefault (BitFlags.defaultSettings 25) (BitFlags.initSettings { bitLimit = 25, flags = l }))
         )
+        (Decode.field "savedViews" (Decode.list savedViewDecoder))
 
 
 localStoreEncoder : Model -> Encode.Value
@@ -168,6 +182,7 @@ localStoreEncoder model =
         [ ( "tasks", Encode.list lunarTaskEncoder model.tasks )
         , ( "taskOwner", Encode.string model.taskOwner )
         , ( "bitFlags", Encode.list Encode.string (BitFlags.serialize model.tagSettings) )
+        , ( "savedViews", Encode.list savedViewEncoder model.savedViews )
         ]
 
 
@@ -178,15 +193,23 @@ localStoreEncoder model =
 generateCacheDigest : List LunarTask -> Model -> String
 generateCacheDigest tasks model =
     let
+        tags : String
         tags =
             model.tagSettings
                 |> BitFlags.serialize
                 |> String.join ","
+
+        savedViews : String
+        savedViews =
+            model.savedViews
+                |> Encode.list savedViewEncoder
+                |> Encode.encode 0
     in
     tasks
         |> Encode.list lunarTaskEncoder
         |> Encode.encode 0
         |> (++) tags
+        |> (++) savedViews
         |> SHA1.fromString
         |> SHA1.toHex
 
@@ -234,11 +257,13 @@ type alias LoginAttributes r =
         , tagSettings : BitFlagSettings
         , banner : String
         , tagResourcesLoaded : Bool
+        , savedViewResourcesLoaded : Bool
+        , listSettingsAlreadyInitializedFromQueryParams : Bool
     }
 
 
-resetLogin : LoginAttributes r -> LoginAttributes r
-resetLogin attrs =
+resetLoginAttributes : LoginAttributes r -> LoginAttributes r
+resetLoginAttributes attrs =
     { attrs
         | tasks = []
         , demo = Nothing
@@ -247,6 +272,8 @@ resetLogin attrs =
         , tagSettings = BitFlags.defaultSettings 25
         , banner = ""
         , tagResourcesLoaded = False
+        , savedViewResourcesLoaded = False
+        , listSettingsAlreadyInitializedFromQueryParams = False
     }
 
 
@@ -260,6 +287,31 @@ datePickerSettings =
             , style "text-align" "center"
             ]
     }
+
+
+savedViewDropdownConfig : Dropdown.Config SavedView Msg Model
+savedViewDropdownConfig =
+    let
+        itemToTitle item =
+            getSavedViewName item
+                |> String.pad 20 ' '
+    in
+    Dropdown.basic
+        { itemsFromModel = \m -> m.savedViews
+        , selectionFromModel = \m -> findMatchingSavedView (currentView m) m.savedViews
+        , dropdownMsg = SavedViewDropdown
+        , onSelectMsg = SavedViewSelection
+        , itemToPrompt = \savedView -> el [] (text <| itemToTitle savedView)
+        , itemToElement = \_ _ savedView -> el [] (text <| itemToTitle savedView)
+        }
+        |> Dropdown.withListAttributes
+            [ Border.solid
+            , Border.color color.grey
+            , Border.width 1
+            , Background.color color.white
+            ]
+        |> Dropdown.withPromptElement (el [] <| text "-- Saved Views --")
+        |> Dropdown.withContainerAttributes [ pointer ]
 
 
 
@@ -283,6 +335,7 @@ init flags url key =
 initWithMaybeNavKey : Flags -> Url -> Maybe Nav.Key -> ( Model, Cmd Msg )
 initWithMaybeNavKey ( currentTimeinMillis, validAuth ) url maybeKey =
     let
+        -- kick off login msg if we know we have a pre-existing valid pb authentication
         loginCmd =
             if validAuth then
                 userLoginAction "login"
@@ -320,11 +373,22 @@ initWithMaybeNavKey ( currentTimeinMillis, validAuth ) url maybeKey =
             , taskOwner = ""
             , currentDate = currentDate
             , currentZone = currentZone
+
+            -- filter will be overridden on init with default saved view
             , filter = FilterAll
+
+            -- sort will be overridden on init with default saved view
             , sort = NoSort DESC
-            , tagsSelected = ( Set.empty, Set.empty )
+
+            -- tags selected will be overridden on init with default saved view
+            , tagsSelected = ( 0, 0 )
             , tagSettings = BitFlags.defaultSettings 25
+
+            -- search term will be overridden on init with default saved view
             , searchTerm = Nothing
+            , savedViews = []
+            , savedViewDropdownState = Dropdown.init "saved-view-dropdown"
+            , savedViewTitleInput = ""
             , datePicker = newDatePicker
             , datePickerForManualPastDue = newDatePickerForManualPastDue
             , view = loadingOrLoginView
@@ -342,12 +406,14 @@ initWithMaybeNavKey ( currentTimeinMillis, validAuth ) url maybeKey =
             , tagSearchBoxText = ""
             , tagSearchBoxSelected = Nothing
             , tagResourcesLoaded = False
+            , savedViewResourcesLoaded = False
+            , listSettingsAlreadyInitializedFromQueryParams = False
             , lastCacheCheckAt = currentTime
             , receivedCurrentTimeAt = currentTime
+            , cacheDigestChangedCount = 0
             }
     in
     ( model
-        |> initListSettingsFromQueryParams model.url
     , Cmd.batch
         [ loginCmd
         , Time.now |> Task.perform ReceivedCurrentTime
@@ -369,13 +435,23 @@ type Msg
     | SelectTagToEdit (Maybe String)
     | DeleteTag String
     | UpdatedTagNameInput String
-    | CompareCacheDigest Decode.Value
     | CreateTag
     | UpdateTag String
     | Search String
     | ClearSearch
     | ClearBanner
+    | SavedViewRemove
+      -- | SavedViewRemoved Decode.Value
+    | SavedViewAdd
+      -- | SavedViewAdded Decode.Value
+    | SavedViewDropdown (Dropdown.Msg SavedView)
+    | SavedViewSelection (Maybe SavedView)
+    | SavedViewEditTitle String
+    | SavedViewUpdateTitleInput String
+    | SavedViewUpdateTitle
+    | SavedViewUpdated Decode.Value
     | FilterReset
+    | UserDataFetched Decode.Value
     | LocalStoreFetched Decode.Value
     | ToggleSortOrder
     | ToggleNoteEdit
@@ -394,7 +470,6 @@ type Msg
     | VisibilityChanged Visibility
     | LogOutUser Int
     | LoadTasks Decode.Value
-    | LoadTags Decode.Value
     | LoginUser Int
     | DemoLoginUser Int
     | LoadDemo (Result Http.Error String)
@@ -406,9 +481,86 @@ type Msg
     | NoOp
 
 
+maybeUpdateQueryParams : ( Model, List (Cmd Msg) ) -> ( Model, List (Cmd Msg) )
+maybeUpdateQueryParams ( m, lc ) =
+    -- if the dependent resources are loaded and we have yet to perform an initial load of query params,
+    -- go ahead and perform the initial load, then repeat function to proceed with query param update
+    if
+        m.savedViewResourcesLoaded
+            && m.tagResourcesLoaded
+            && not m.listSettingsAlreadyInitializedFromQueryParams
+    then
+        let
+            modelWithInitializedQueryParams =
+                initListSettingsFromQueryParams m.url m
+        in
+        maybeUpdateQueryParams
+            ( { modelWithInitializedQueryParams
+                | listSettingsAlreadyInitializedFromQueryParams = True
+              }
+            , lc
+            )
+
+    else if m.listSettingsAlreadyInitializedFromQueryParams then
+        case m.maybeKey of
+            Just key ->
+                let
+                    oldQueryString =
+                        m.url.query
+
+                    newQueryString =
+                        generateQueryParams m
+                in
+                if Maybe.withDefault "" oldQueryString /= newQueryString then
+                    ( m, Nav.replaceUrl key ("/" ++ newQueryString) :: lc )
+
+                else
+                    ( m, lc )
+
+            Nothing ->
+                ( m, lc )
+
+    else
+        ( m, lc )
+
+
 update : Msg -> Model -> ( Model, Cmd Msg )
-update msg model =
+update msg rawModel =
     let
+        -- MIDDLEWARE LOGIC
+        model : Model
+        model =
+            rawModel
+                |> userAbortedSavedViewTitleUpdate
+
+        userAbortedSavedViewTitleUpdate : Model -> Model
+        userAbortedSavedViewTitleUpdate m =
+            case m.view of
+                LoadedTasksView loadedTasksViewType ->
+                    case loadedTasksViewType of
+                        MainTasksView EditSavedViewTitle ->
+                            case msg of
+                                SavedViewUpdateTitle ->
+                                    m
+
+                                SavedViewUpdateTitleInput _ ->
+                                    m
+
+                                ProcessDownKeys _ ->
+                                    m
+
+                                ReceivedCurrentTime _ ->
+                                    m
+
+                                _ ->
+                                    { m | view = LoadedTasksView (MainTasksView Normal) }
+
+                        _ ->
+                            m
+
+                _ ->
+                    m
+
         -- PORT HELPERS
         deleteTask : Encode.Value -> Cmd msg
         deleteTask encodedTask =
@@ -418,17 +570,17 @@ update msg model =
         fetchTasks =
             taskAction ( "fetch", Encode.null )
 
-        fetchTags : Cmd msg
-        fetchTags =
-            userActions ( "fetchTags", model.taskOwner, Encode.null )
-
         updateTags : Encode.Value -> Cmd msg
         updateTags encodedTags =
             userActions ( "updateTags", model.taskOwner, encodedTags )
 
-        fetchCacheDigest : Cmd msg
-        fetchCacheDigest =
-            userActions ( "fetchCacheDigest", model.taskOwner, Encode.null )
+        fetchUserData : Cmd msg
+        fetchUserData =
+            userActions ( "fetchUserData", model.taskOwner, Encode.null )
+
+        updateSavedViews : Encode.Value -> Cmd msg
+        updateSavedViews encodedSavedViews =
+            userActions ( "updateSavedViews", model.taskOwner, encodedSavedViews )
 
         updateCacheDigest : String -> Cmd msg
         updateCacheDigest newDigest =
@@ -443,35 +595,128 @@ update msg model =
             in
             ( { m | currentDate = newDate }, lc )
 
-        maybeUpdateQueryParams : ( Model, List (Cmd Msg) ) -> ( Model, List (Cmd Msg) )
-        maybeUpdateQueryParams ( m, lc ) =
-            case m.maybeKey of
-                Just key ->
+        processSavedViews : Decode.Value -> ( Model, List (Cmd Msg) ) -> ( Model, List (Cmd Msg) )
+        processSavedViews jsonSavedViews ( m, lc ) =
+            let
+                savedViewsDecoder =
+                    Decode.at [ "savedViews" ] <|
+                        Decode.oneOf [ Decode.list savedViewDecoder, Decode.null [] ]
+            in
+            case Decode.decodeValue savedViewsDecoder jsonSavedViews of
+                Ok savedViews ->
                     let
-                        oldQueryString =
-                            m.url.query
-
-                        newQueryString =
-                            generateQueryParams m
+                        modelWithLoadedSavedViews =
+                            { m | savedViews = savedViews, savedViewResourcesLoaded = True }
                     in
-                    if Maybe.withDefault "" oldQueryString /= newQueryString then
-                        ( m, Nav.replaceUrl key ("/" ++ newQueryString) :: lc )
+                    ( modelWithLoadedSavedViews
+                    , lc
+                    )
 
-                    else
+                Err errMsg ->
+                    ( { m
+                        | banner = errorToString errMsg
+                      }
+                    , lc
+                    )
+
+        processTags : Decode.Value -> ( Model, List (Cmd Msg) ) -> ( Model, List (Cmd Msg) )
+        processTags jsonTags ( m, lc ) =
+            let
+                updateDecoder =
+                    Decode.at [ "tags" ] <|
+                        Decode.oneOf [ Decode.list Decode.string, Decode.null [] ]
+
+                fetchDecoder =
+                    Decode.at [ "items" ] <|
+                        Decode.index 0 <|
+                            Decode.at [ "tags" ] <|
+                                Decode.oneOf [ Decode.list Decode.string, Decode.null [] ]
+            in
+            case
+                Decode.decodeValue
+                    (Decode.oneOf
+                        [ fetchDecoder
+                        , updateDecoder
+                        ]
+                    )
+                    jsonTags
+            of
+                Ok tags ->
+                    let
+                        modelWithLoadedTags =
+                            { m
+                                | tagSettings =
+                                    Result.withDefault
+                                        m.tagSettings
+                                        (BitFlags.initSettings { bitLimit = 25, flags = tags })
+                                , tagResourcesLoaded = True
+                            }
+                    in
+                    ( modelWithLoadedTags
+                    , lc
+                    )
+
+                Err errMsg ->
+                    ( { m
+                        | banner = errorToString errMsg
+                      }
+                    , lc
+                    )
+
+        processCacheDigest : Decode.Value -> ( Model, List (Cmd Msg) ) -> ( Model, List (Cmd Msg) )
+        processCacheDigest jsonUser ( m, lc ) =
+            let
+                digestCacheDecoder =
+                    Decode.at [ "cacheDigest" ] <|
+                        Decode.string
+            in
+            if
+                m.tagResourcesLoaded
+                    && m.savedViewResourcesLoaded
+                    && m.listSettingsAlreadyInitializedFromQueryParams
+                    && (m.cacheDigestChangedCount < 200)
+            then
+                case Decode.decodeValue digestCacheDecoder jsonUser of
+                    Ok backendCacheDigest ->
+                        let
+                            currentCacheDigest =
+                                generateCacheDigest m.tasks model
+                        in
+                        -- if current local cache digest includes tag and saved view data
+                        -- just received from user record, so presumably a fresh pull of tasks
+                        -- is the only resource component required.
+                        if backendCacheDigest /= currentCacheDigest then
+                            let
+                                newCacheDigestChangedCount =
+                                    model.cacheDigestChangedCount + 1
+                            in
+                            ( { m
+                                | lastCacheCheckAt = model.receivedCurrentTimeAt
+                                , cacheDigestChangedCount = newCacheDigestChangedCount
+                              }
+                            , fetchTasks :: lc
+                            )
+
+                        else
+                            ( { m | lastCacheCheckAt = model.receivedCurrentTimeAt }
+                            , lc
+                            )
+
+                    Err _ ->
                         ( m, lc )
 
-                Nothing ->
-                    ( m, lc )
+            else
+                ( m, lc )
 
-        fetchCacheDigestIfXMinutesSinceCheck : Int -> ( Model, List (Cmd Msg) ) -> ( Model, List (Cmd Msg) )
-        fetchCacheDigestIfXMinutesSinceCheck minutes ( m, lc ) =
+        fetchUserDataIfXMinutesSinceCacheDigestCheck : Int -> ( Model, List (Cmd Msg) ) -> ( Model, List (Cmd Msg) )
+        fetchUserDataIfXMinutesSinceCacheDigestCheck minutes ( m, lc ) =
             let
                 timeSinceLastCacheCheck =
                     Time.posixToMillis m.receivedCurrentTimeAt - Time.posixToMillis m.lastCacheCheckAt
             in
-            -- fetch cache digest every X minutes
+            -- fetch current cache digest record on backend every X minutes
             if timeSinceLastCacheCheck > (minutes * 60000) && not (isPresent m.demo) then
-                ( m, fetchCacheDigest :: lc )
+                ( m, fetchUserData :: lc )
 
             else
                 ( m, lc )
@@ -499,16 +744,19 @@ update msg model =
                     update (LoadTasks data.payload) model
 
                 "tagsFetched" ->
-                    update (LoadTags data.payload) model
+                    update (UserDataFetched data.payload) model
 
                 "tagsUpdated" ->
-                    update (LoadTags data.payload) model
+                    update (UserDataFetched data.payload) model
+
+                "savedViewsUpdated" ->
+                    update (UserDataFetched data.payload) model
+
+                "userDataFetched" ->
+                    update (UserDataFetched data.payload) model
 
                 "localStoreFetched" ->
                     update (LocalStoreFetched data.payload) model
-
-                "cacheDigestFetched" ->
-                    update (CompareCacheDigest data.payload) model
 
                 unknownMessage ->
                     update (LoadTasks Encode.null) { model | banner = "Recv data unrecognized: " ++ unknownMessage }
@@ -531,32 +779,6 @@ update msg model =
 
                 Nothing ->
                     ( { model | view = LoadedTasksView (TagSettingsView Nothing), tagNameInput = "" }, Cmd.none )
-
-        CompareCacheDigest jsonUser ->
-            let
-                digestCacheDecoder =
-                    Decode.at [ "cacheDigest" ] <|
-                        Decode.string
-            in
-            case Decode.decodeValue digestCacheDecoder jsonUser of
-                Ok backendCacheDigest ->
-                    let
-                        currentCacheDigest =
-                            generateCacheDigest model.tasks model
-
-                        commands =
-                            if backendCacheDigest /= currentCacheDigest then
-                                Cmd.batch [ fetchTasks, fetchTags ]
-
-                            else
-                                Cmd.none
-                    in
-                    ( { model | lastCacheCheckAt = model.receivedCurrentTimeAt }
-                    , commands
-                    )
-
-                Err _ ->
-                    ( model, Cmd.none )
 
         CreateTag ->
             let
@@ -619,11 +841,152 @@ update msg model =
                 |> maybeUpdateQueryParams
                 |> batchCmdList
 
+        SavedViewAdd ->
+            let
+                updatedSavedViews =
+                    currentView model :: model.savedViews
+
+                encodedSavedViews =
+                    Encode.list savedViewEncoder updatedSavedViews
+            in
+            if isPresent model.demo then
+                ( { model | savedViews = updatedSavedViews }, Cmd.none )
+
+            else
+                ( model
+                , updateSavedViews encodedSavedViews
+                )
+
+        SavedViewRemove ->
+            let
+                updatedSavedViews =
+                    List.filter
+                        (\x ->
+                            x /= currentView model
+                        )
+                        model.savedViews
+
+                encodedSavedViews =
+                    Encode.list savedViewEncoder updatedSavedViews
+            in
+            if isPresent model.demo then
+                ( { model | savedViews = updatedSavedViews }, Cmd.none )
+
+            else
+                ( model
+                , updateSavedViews encodedSavedViews
+                )
+
+        SavedViewDropdown subMsg ->
+            let
+                ( updatedSavedViewDropdown, cmd ) =
+                    Dropdown.update
+                        savedViewDropdownConfig
+                        subMsg
+                        model
+                        model.savedViewDropdownState
+            in
+            ( { model | savedViewDropdownState = updatedSavedViewDropdown }, cmd )
+
+        SavedViewSelection maybeSavedView ->
+            case maybeSavedView of
+                Nothing ->
+                    ( model, Cmd.none )
+
+                Just savedView ->
+                    ( model
+                        |> setSavedView savedView
+                    , []
+                    )
+                        |> maybeUpdateQueryParams
+                        |> batchCmdList
+
+        SavedViewEditTitle previousTitle ->
+            ( { model
+                | savedViewTitleInput = previousTitle
+                , view =
+                    LoadedTasksView (MainTasksView EditSavedViewTitle)
+              }
+            , Cmd.none
+            )
+
+        SavedViewUpdateTitleInput title ->
+            ( { model | savedViewTitleInput = title }, Cmd.none )
+
+        SavedViewUpdateTitle ->
+            let
+                currentSavedView =
+                    currentView model
+
+                allButCurrentView =
+                    List.filter
+                        (\x -> not (savedViewMatch currentSavedView x))
+                        model.savedViews
+
+                newTitle =
+                    genUniqueSavedViewName
+                        { model | savedViews = allButCurrentView }
+                        model.savedViewTitleInput
+
+                updatedSavedViews =
+                    { currentSavedView
+                        | title = Just newTitle
+                    }
+                        :: allButCurrentView
+
+                encodedSavedViews =
+                    Encode.list savedViewEncoder updatedSavedViews
+            in
+            if isPresent model.demo then
+                ( { model
+                    | savedViewTitleInput = ""
+                    , view = LoadedTasksView (MainTasksView Normal)
+                    , savedViews =
+                        updatedSavedViews
+                  }
+                , Cmd.none
+                )
+
+            else
+                ( { model
+                    | savedViewTitleInput = ""
+                    , view = LoadedTasksView (MainTasksView Normal)
+                  }
+                , updateSavedViews encodedSavedViews
+                )
+
+        SavedViewUpdated jsonSavedViews ->
+            let
+                savedViewsDecoder =
+                    Decode.at [ "savedViews" ] <|
+                        Decode.oneOf [ Decode.list savedViewDecoder, Decode.null [] ]
+            in
+            case Decode.decodeValue savedViewsDecoder jsonSavedViews of
+                Ok savedViews ->
+                    let
+                        modelWithLoadedSavedViews =
+                            { model | savedViews = savedViews }
+                    in
+                    ( modelWithLoadedSavedViews
+                    , [ localStoreAction ( "set", localStoreEncoder modelWithLoadedSavedViews )
+                      , updateCacheDigest (generateCacheDigest modelWithLoadedSavedViews.tasks modelWithLoadedSavedViews)
+                      ]
+                    )
+                        |> maybeUpdateQueryParams
+                        |> batchCmdList
+
+                Err errMsg ->
+                    ( { model
+                        | banner = errorToString errMsg
+                      }
+                    , Cmd.none
+                    )
+
         ClearBanner ->
             ( { model | banner = "" }, Cmd.none )
 
         FilterReset ->
-            ( model |> resetFilter, [] )
+            ( model |> setSavedView defaultSavedView, [] )
                 |> maybeUpdateQueryParams
                 |> batchCmdList
 
@@ -647,6 +1010,17 @@ update msg model =
 
         ViewChange viewType ->
             ( { model | view = viewType }, Cmd.none )
+
+        UserDataFetched encodedUserData ->
+            ( model
+            , []
+            )
+                |> processTags encodedUserData
+                |> processSavedViews encodedUserData
+                |> (\( m, lc ) -> ( m, updateCacheDigest (generateCacheDigest m.tasks m) :: lc ))
+                |> processCacheDigest encodedUserData
+                |> maybeUpdateQueryParams
+                |> batchCmdList
 
         MarkTaskCompleted task entryDate ->
             let
@@ -689,14 +1063,14 @@ update msg model =
         ReceivedCurrentTime time ->
             ( { model | receivedCurrentTimeAt = time }, [] )
                 |> adjustDate
-                |> fetchCacheDigestIfXMinutesSinceCheck 20
+                |> fetchUserDataIfXMinutesSinceCacheDigestCheck 20
                 |> batchCmdList
 
         VisibilityChanged visibility ->
             case visibility of
                 Visible ->
                     ( model, [] )
-                        |> fetchCacheDigestIfXMinutesSinceCheck 5
+                        |> fetchUserDataIfXMinutesSinceCacheDigestCheck 5
                         |> batchCmdList
 
                 Hidden ->
@@ -768,7 +1142,18 @@ update msg model =
                     ( { model | banner = Decode.errorToString err }, Cmd.none )
 
         LogOutUser _ ->
-            ( model |> resetLogin, userLoginAction "logout" )
+            ( model
+                |> setSavedView defaultSavedView
+            , [ localStoreAction ( "clear", Encode.null ) ]
+            )
+                |> maybeUpdateQueryParams
+                |> (\( m, lc ) ->
+                        ( m
+                            |> resetLoginAttributes
+                        , lc
+                        )
+                   )
+                |> batchCmdList
 
         DemoLoginUser _ ->
             let
@@ -785,7 +1170,9 @@ update msg model =
                 , taskOwner = "demoTaskOwnerId"
                 , tagSettings =
                     Result.withDefault (BitFlags.defaultSettings 25) flagSettingsResult
+                , savedViewResourcesLoaded = True
                 , tagResourcesLoaded = True
+                , listSettingsAlreadyInitializedFromQueryParams = True
               }
             , Cmd.batch
                 [ Http.get { url = "/demo-data.json", expect = Http.expectString LoadDemo }
@@ -799,7 +1186,7 @@ update msg model =
                     case Decode.decodeString (Decode.list lunarTaskDecoder) demoDataString of
                         Ok tasks ->
                             ( { model
-                                | view = LoadedTasksView MainTasksView
+                                | view = LoadedTasksView (MainTasksView Normal)
                                 , tasks = tasks
                               }
                             , Cmd.none
@@ -852,7 +1239,7 @@ update msg model =
                         loadedTasksModel =
                             { model
                                 | tasks = tasks
-                                , view = LoadedTasksView MainTasksView
+                                , view = LoadedTasksView (MainTasksView Normal)
                             }
                     in
                     ( loadedTasksModel
@@ -863,56 +1250,6 @@ update msg model =
                     ( { model
                         | view = LoadingTasksFailureView
                         , banner = errorToString errMsg
-                      }
-                    , Cmd.none
-                    )
-
-        LoadTags jsonTags ->
-            let
-                updateDecoder =
-                    Decode.at [ "tags" ] <|
-                        Decode.oneOf [ Decode.list Decode.string, Decode.null [] ]
-
-                fetchDecoder =
-                    Decode.at [ "items" ] <|
-                        Decode.index 0 <|
-                            Decode.at [ "tags" ] <|
-                                Decode.oneOf [ Decode.list Decode.string, Decode.null [] ]
-            in
-            case
-                Decode.decodeValue
-                    (Decode.oneOf
-                        [ fetchDecoder
-                        , updateDecoder
-                        ]
-                    )
-                    jsonTags
-            of
-                Ok tags ->
-                    let
-                        modelWithLoadedTags =
-                            { model
-                                | tagSettings =
-                                    Result.withDefault
-                                        model.tagSettings
-                                        (BitFlags.initSettings { bitLimit = 25, flags = tags })
-                                , tagResourcesLoaded = True
-                            }
-                    in
-                    ( modelWithLoadedTags
-                    , [ -- inform backend of current cached state
-                        updateCacheDigest <| generateCacheDigest model.tasks modelWithLoadedTags
-
-                      -- update local store
-                      , localStoreAction ( "set", localStoreEncoder modelWithLoadedTags )
-                      ]
-                    )
-                        |> maybeUpdateQueryParams
-                        |> batchCmdList
-
-                Err errMsg ->
-                    ( { model
-                        | banner = errorToString errMsg
                       }
                     , Cmd.none
                     )
@@ -930,22 +1267,38 @@ update msg model =
                 Ok localStore ->
                     if model.taskOwner == localStore.taskOwner then
                         ( { model
-                            | view = LoadedTasksView MainTasksView
+                            | view = LoadedTasksView (MainTasksView Normal)
                             , tasks = localStore.tasks
                             , tagSettings = localStore.bitFlags
                             , tagResourcesLoaded = True
+                            , savedViewResourcesLoaded = True
+                            , savedViews = localStore.savedViews
                           }
-                        , fetchCacheDigest
+                        , [ fetchUserData ]
                         )
+                            |> maybeUpdateQueryParams
+                            |> batchCmdList
 
                     else
-                        ( { model | banner = "taskOwner not matching with local store" }, Cmd.batch [ fetchTasks, fetchTags ] )
+                        ( { model | banner = "taskOwner not matching with local store" }
+                        , Cmd.batch
+                            [ fetchTasks
+                            , fetchUserData
+                            , localStoreAction ( "clear", Encode.null )
+                            ]
+                        )
 
                 Err errMsg ->
-                    ( { model | banner = Decode.errorToString errMsg }, Cmd.batch [ fetchTasks, fetchTags ] )
+                    ( { model | banner = Decode.errorToString errMsg }
+                    , Cmd.batch
+                        [ fetchTasks
+                        , fetchUserData
+                        , localStoreAction ( "clear", Encode.null )
+                        ]
+                    )
 
         UrlChanged url ->
-            ( { model | url = url }, Cmd.none )
+            ( { model | url = url, banner = "new url is " ++ Maybe.withDefault "" url.query }, Cmd.none )
 
         UrlRequest _ ->
             ( model, Cmd.none )
@@ -962,7 +1315,7 @@ update msg model =
                     ( model, Cmd.none )
 
                 LoadedTasksView _ ->
-                    ( { model | view = LoadedTasksView MainTasksView }, Cmd.none )
+                    ( { model | view = LoadedTasksView (MainTasksView Normal) }, Cmd.none )
 
         NoOp ->
             ( model, Cmd.none )
@@ -1066,7 +1419,7 @@ updateEditedTask editTaskMsg model =
                     ( { model | view = LoadedTasksView (EditTaskView False), editedTask = Just task }, Cmd.none )
 
         Cancel ->
-            ( { model | editedTask = Nothing, view = LoadedTasksView MainTasksView }, Cmd.none )
+            ( { model | editedTask = Nothing, view = LoadedTasksView (MainTasksView Normal) }, Cmd.none )
 
         Save ->
             case model.editedTask of
@@ -1096,7 +1449,7 @@ updateEditedTask editTaskMsg model =
                             update (TaskUpdated (lunarTaskEncoder editedTask))
                                 { model
                                     | editedTask = Nothing
-                                    , view = LoadedTasksView MainTasksView
+                                    , view = LoadedTasksView (MainTasksView Normal)
                                 }
 
                         else
@@ -1107,13 +1460,13 @@ updateEditedTask editTaskMsg model =
                             in
                             ( { model
                                 | editedTask = Nothing
-                                , view = LoadedTasksView MainTasksView
+                                , view = LoadedTasksView (MainTasksView Normal)
                               }
                             , updateTask (lunarTaskEncoder editedTask)
                             )
 
                     else
-                        ( { model | editedTask = Nothing, view = LoadedTasksView MainTasksView }, Cmd.none )
+                        ( { model | editedTask = Nothing, view = LoadedTasksView (MainTasksView Normal) }, Cmd.none )
 
         RemoveManualPastDueDate ->
             case model.editedTask of
@@ -1421,11 +1774,11 @@ loginlogoutButton viewType =
 
         exportButton =
             case viewType of
-                LoadedTasksView MainTasksView ->
+                LoadedTasksView (MainTasksView _) ->
                     button buttonAttrs { label = text "JSON export", onPress = Just (ViewChange (LoadedTasksView JsonExportView)) }
 
                 _ ->
-                    button buttonAttrs { label = text "Return to Main", onPress = Just (ViewChange (LoadedTasksView MainTasksView)) }
+                    button buttonAttrs { label = text "Return to Main", onPress = Just (ViewChange (LoadedTasksView (MainTasksView Normal))) }
 
         logoutButton =
             row rowSpecs
@@ -1531,7 +1884,7 @@ view model =
                 LoadingTasksFailureView ->
                     el [] (text "")
 
-                LoadedTasksView MainTasksView ->
+                LoadedTasksView (MainTasksView _) ->
                     viewMain model
 
                 LoadedTasksView (EditTaskView editingNotes) ->
@@ -2157,6 +2510,9 @@ radioOption label maybeSortOrder state =
 viewTaskDiscovery : Model -> Element Msg
 viewTaskDiscovery model =
     let
+        maybeSavedView =
+            findMatchingSavedView (currentView model) model.savedViews
+
         filterRow =
             Input.radioRow [ spacingXY 25 0, Font.semiBold ]
                 { onChange = SelectFilter
@@ -2193,6 +2549,44 @@ viewTaskDiscovery model =
                 , label = Input.labelHidden "search"
                 }
 
+        currentViewisDefaultView =
+            savedViewMatch defaultSavedView (currentView model)
+
+        saveViewBtn =
+            if not <| currentViewIsSavedView model then
+                button
+                    [ centerY
+                    , transparent currentViewisDefaultView
+                    ]
+                    { onPress = Just SavedViewAdd
+                    , label = Icon.star |> Icon.toHtml [] |> Element.html
+                    }
+
+            else
+                let
+                    savedViewTitle =
+                        case maybeSavedView of
+                            Nothing ->
+                                ""
+
+                            Just savedView ->
+                                Maybe.withDefault "" savedView.title
+                in
+                row []
+                    [ button
+                        [ centerY
+                        ]
+                        { onPress = Just (SavedViewEditTitle savedViewTitle)
+                        , label = Icon.edit |> Icon.toHtml [] |> Element.html
+                        }
+                    , button
+                        [ centerY
+                        ]
+                        { onPress = Just SavedViewRemove
+                        , label = Icon.trash2 |> Icon.toHtml [] |> Element.html
+                        }
+                    ]
+
         clearSearchBtn =
             button
                 [ transparent (Maybe.withDefault "" model.searchTerm == "")
@@ -2202,24 +2596,20 @@ viewTaskDiscovery model =
                 , label = Icon.x |> Icon.toHtml [] |> Element.html
                 }
 
-        displayResetOption : Bool
-        displayResetOption =
-            (model.filter == FilterAll)
-                && (model.sort == NoSort DESC)
-                && (model.searchTerm == Nothing)
-                && Set.isEmpty (Tuple.first model.tagsSelected)
-                && Set.isEmpty (Tuple.second model.tagsSelected)
-
-        resetOption =
-            button
-                [ transparent displayResetOption ]
-                { label = text "(x) reset all selections", onPress = Just FilterReset }
+        savedViewDropdown =
+            Dropdown.view savedViewDropdownConfig model model.savedViewDropdownState
 
         getTagState : String -> TagToggleState
         getTagState tag =
             let
+                showEnabledTags =
+                    model.tagSettings
+                        |> BitFlags.enabledFlags
+
                 ( whitelistedTags, blacklistedTags ) =
                     model.tagsSelected
+                        |> Tuple.mapBoth showEnabledTags showEnabledTags
+                        |> Tuple.mapBoth Set.fromList Set.fromList
             in
             if Set.member tag whitelistedTags then
                 Whitelisted
@@ -2264,6 +2654,41 @@ viewTaskDiscovery model =
                         allTags
                         ++ [ tagSettingsBtn ]
                     )
+
+        savedViewsRow =
+            case model.view of
+                LoadedTasksView (MainTasksView EditSavedViewTitle) ->
+                    case maybeSavedView of
+                        Nothing ->
+                            el [] (text "woops")
+
+                        Just _ ->
+                            Element.html <|
+                                Html.div []
+                                    [ Html.input
+                                        [ Html.Attributes.type_ "text"
+                                        , Html.Attributes.placeholder "Saved View Title"
+                                        , Html.Attributes.value model.savedViewTitleInput
+                                        , Html.Events.onInput SavedViewUpdateTitleInput
+                                        ]
+                                        []
+                                    , Icon.plusCircle |> Icon.toHtml [ Html.Events.onClick SavedViewUpdateTitle ]
+                                    ]
+
+                _ ->
+                    row [] [ row [ Border.width 1 ] [ savedViewDropdown ], saveViewBtn ]
+
+        resetRow =
+            row
+                [ transparent currentViewisDefaultView
+                ]
+                [ el
+                    [ onClick (SavedViewSelection <| Just defaultSavedView)
+                    , pointer
+                    ]
+                  <|
+                    text "(x) reset all selections"
+                ]
     in
     column [ spacingXY 0 15 ]
         [ filterRow
@@ -2273,19 +2698,25 @@ viewTaskDiscovery model =
             , clearSearchBtn
             ]
         , tagsRow
-        , resetOption
+        , savedViewsRow
+        , resetRow
         ]
 
 
 viewMain : Model -> Element Msg
 viewMain model =
     let
+        enabledFlags =
+            model.tagSettings
+                |> BitFlags.enabledFlags
+
         ( whitelistedTags, blacklistedTags ) =
             model.tagsSelected
+                |> Tuple.mapBoth enabledFlags enabledFlags
 
         tasks =
             model.tasks
-                |> filterByTags (BitFlags.match model.tagSettings (Set.toList whitelistedTags) (Set.toList blacklistedTags))
+                |> filterByTags (BitFlags.match model.tagSettings whitelistedTags blacklistedTags)
                 |> filterTaskList model.filter model.currentDate
                 |> filterByTerm model.searchTerm
                 |> sortTaskList model.sort model.currentDate

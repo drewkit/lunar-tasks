@@ -33,19 +33,19 @@
     app.ports.userActions.subscribe(function(args) {
       var [action, userId, actionPayload] = args
       if (action == "updateTags") {
-        pb.collection("users").update(userId, {tags: actionPayload}, {fields: "tags"}).then(function(updatedTags) {
+        pb.collection("users").update(userId, {tags: actionPayload}).then(function(updatedTags) {
           app.ports.messageReceiver.send({tag: "tagsUpdated", payload: updatedTags})
         })
-      } else if (action == "fetchTags") {
-        pb.collection("users").getOne(userId).then(function(fetchedTags) {
-          app.ports.messageReceiver.send({tag: "tagsFetched", payload: fetchedTags})
+      } else if (action == "updateSavedViews") {
+        pb.collection("users").update(userId, {savedViews: actionPayload}).then(function(updatedSavedViews) {
+          app.ports.messageReceiver.send({tag: "savedViewsUpdated", payload: updatedSavedViews})
+        })
+      } else if (action == "fetchUserData") {
+        pb.collection("users").getOne(userId).then(function(fetchedUserData) {
+          app.ports.messageReceiver.send({tag: "userDataFetched", payload: fetchedUserData})
         })
       } else if (action == "updateCacheDigest") {
         pb.collection("users").update(userId, {cacheDigest: actionPayload})
-      } else if (action == "fetchCacheDigest") {
-        pb.collection("users").getOne(userId).then(function(fetchedCacheDigest) {
-          app.ports.messageReceiver.send({tag: "cacheDigestFetched", payload: fetchedCacheDigest})
-        })
       } else {
         console.log("tag action unrecognized: ", action)
       }

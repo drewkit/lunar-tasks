@@ -38,8 +38,12 @@ suite =
             , fragment = Nothing
             }
 
-        ( testModel, _ ) =
+        ( rawTestModel, _ ) =
             initWithMaybeNavKey ( 1711211815576, True ) url Nothing
+
+        ( testModel, _ ) =
+            ( { rawTestModel | tagResourcesLoaded = True, savedViewResourcesLoaded = True }, [] )
+                |> maybeUpdateQueryParams
 
         fallOrdinal =
             280
@@ -54,7 +58,83 @@ suite =
             fallOrdinal
     in
     describe "Lunar Tasks"
-        [ describe "when the manual past due date is set"
+        [ describe "Saved Views"
+            [ test "will ensure unique title on update/create events" <|
+                \_ ->
+                    let
+                        savedView =
+                            currentView { testModel | searchTerm = Just "wash" }
+
+                        ( testModelOne, _ ) =
+                            update SavedViewAdd
+                                { testModel
+                                    | savedViews = [ savedView ]
+                                    , searchTerm = Just "wash"
+                                    , demo = Just { demoId = 1 }
+                                    , filter = FilterNonPastDue
+                                }
+                    in
+                    case List.head testModelOne.savedViews of
+                        Nothing ->
+                            Expect.fail "no saved view found"
+
+                        Just sv ->
+                            Expect.equal sv.title (Just "wash (1)")
+            , test "increments for unique title" <|
+                \_ ->
+                    let
+                        savedView =
+                            currentView { testModel | searchTerm = Just "wash" }
+
+                        ( testModelOne, _ ) =
+                            update SavedViewAdd
+                                { testModel
+                                    | savedViews = [ savedView ]
+                                    , searchTerm = Just "wash"
+                                    , demo = Just { demoId = 1 }
+                                    , filter = FilterNonPastDue
+                                }
+
+                        ( testModelTwo, _ ) =
+                            update SavedViewAdd
+                                { testModelOne
+                                    | filter = FilterAll
+                                }
+                    in
+                    case List.head testModelTwo.savedViews of
+                        Nothing ->
+                            Expect.fail "no saved view found"
+
+                        Just sv ->
+                            Expect.equal sv.title (Just "wash (2)")
+            , describe "when renaming title"
+                [ test "nothing changes when title hasn't changed" <|
+                    \_ ->
+                        let
+                            savedView =
+                                currentView { testModel | searchTerm = Just "wash" }
+
+                            ( testModelOne, _ ) =
+                                update SavedViewAdd
+                                    { testModel
+                                        | savedViews = [ savedView ]
+                                        , searchTerm = Just "wash"
+                                        , demo = Just { demoId = 1 }
+                                        , filter = FilterNonPastDue
+                                    }
+
+                            ( testModelTwo, _ ) =
+                                update SavedViewUpdateTitle { testModelOne | savedViewTitleInput = "wash (1)" }
+                        in
+                        case List.head testModelTwo.savedViews of
+                            Nothing ->
+                                Expect.fail "no saved view found"
+
+                            Just sv ->
+                                Expect.equal sv.title (Just "wash (1)")
+                ]
+            ]
+        , describe "when the manual past due date is set"
             [ test "the past due state of task can be pushed back to a later date" <|
                 \_ ->
                     let

@@ -1,7 +1,10 @@
 module ListSettings exposing (..)
 
+import BitFlags
 import Date
 import Dict
+import Json.Decode as Decode exposing (Decoder, errorToString)
+import Json.Encode as Encode
 import LunarTask exposing (..)
 import Set exposing (Set)
 import Url exposing (Url)
@@ -10,12 +13,255 @@ import Url.Parser exposing ((<?>), Parser)
 import Url.Parser.Query as QueryParser
 
 
+type alias SavedView =
+    { filter : ListFilter
+    , sort : ListSort
+    , tagsSelected : ( Int, Int )
+    , searchTerm : Maybe String
+    , title : Maybe String
+    }
+
+
+savedViewEncoder : SavedView -> Encode.Value
+savedViewEncoder savedView =
+    let
+        ( listSortType, listSortOrder ) =
+            sortToStr savedView.sort
+    in
+    Encode.object
+        [ ( "filter", Encode.string (filterToStr savedView.filter) )
+        , ( "sortType", Encode.string listSortType )
+        , ( "sortOrder", Encode.string listSortOrder )
+        , ( "tagsWhitelisted", Encode.int (Tuple.first savedView.tagsSelected) )
+        , ( "tagsBlacklisted", Encode.int (Tuple.second savedView.tagsSelected) )
+        , ( "searchTerm", Encode.string (Maybe.withDefault "" savedView.searchTerm) )
+        , ( "title", Encode.string (Maybe.withDefault "" savedView.title) )
+        ]
+
+
+filterToStr : ListFilter -> String
+filterToStr filter =
+    filterToQueryParam filter
+
+
+sortToStr : ListSort -> ( String, String )
+sortToStr listSort =
+    listSortToQueryParam listSort
+
+
+savedViewDecoder : Decoder SavedView
+savedViewDecoder =
+    Decode.map7
+        (\listFilter whitelistTags blacklistTags title searchTerm sortType sortOrder ->
+            SavedView
+                listFilter
+                (strToListSort sortOrder sortType)
+                ( whitelistTags, blacklistTags )
+                (Just searchTerm)
+                (Just title)
+        )
+        (Decode.field "filter" listFilterDecoder)
+        (Decode.field "tagsWhitelisted" Decode.int)
+        (Decode.field "tagsBlacklisted" Decode.int)
+        (Decode.field "title" Decode.string)
+        (Decode.field "searchTerm" Decode.string)
+        (Decode.field "sortType" Decode.string)
+        (Decode.field "sortOrder" sortOrderDecoder)
+
+
+listFilterDecoder : Decoder ListFilter
+listFilterDecoder =
+    Decode.map strToListFilter Decode.string
+
+
+strToListFilter : String -> ListFilter
+strToListFilter str =
+    case str of
+        "pastdue" ->
+            FilterPastDue
+
+        "nonpastdue" ->
+            FilterNonPastDue
+
+        "all" ->
+            FilterAll
+
+        -- not in use
+        "filterpastduebydays" ->
+            FilterPastDueByDays 1
+
+        -- not in use
+        "filterpastduebyperiods" ->
+            FilterPastDueByPeriods 1
+
+        _ ->
+            FilterAll
+
+
+sortOrderDecoder : Decoder SortOrder
+sortOrderDecoder =
+    Decode.string
+        |> Decode.map
+            (\str ->
+                case str of
+                    "asc" ->
+                        ASC
+
+                    "desc" ->
+                        DESC
+
+                    _ ->
+                        ASC
+            )
+
+
+strToSortOrder : String -> SortOrder
+strToSortOrder str =
+    case str of
+        "asc" ->
+            ASC
+
+        "desc" ->
+            DESC
+
+        _ ->
+            ASC
+
+
+strToListSort : SortOrder -> String -> ListSort
+strToListSort sortOrder str =
+    case str of
+        "days" ->
+            SortPastDueDays sortOrder
+
+        "period" ->
+            SortPastDuePeriods sortOrder
+
+        "lastcompleted" ->
+            SortLastCompleted sortOrder
+
+        "createdat" ->
+            NoSort sortOrder
+
+        _ ->
+            NoSort sortOrder
+
+
+defaultSavedView : SavedView
+defaultSavedView =
+    { filter = FilterAll
+    , sort = NoSort DESC
+    , tagsSelected = ( 0, 0 )
+    , searchTerm = Nothing
+    , title = Nothing
+    }
+
+
+setSavedView : SavedView -> ListSettings r -> ListSettings r
+setSavedView savedView listSettings =
+    { listSettings
+        | filter = savedView.filter
+        , sort = savedView.sort
+        , tagsSelected = savedView.tagsSelected
+        , searchTerm = savedView.searchTerm
+    }
+
+
+savedViewMatch : SavedView -> SavedView -> Bool
+savedViewMatch a b =
+    a.filter
+        == b.filter
+        && a.sort
+        == b.sort
+        && a.tagsSelected
+        == b.tagsSelected
+        && a.searchTerm
+        == b.searchTerm
+
+
+findMatchingSavedView : SavedView -> List SavedView -> Maybe SavedView
+findMatchingSavedView currentSavedView savedViews =
+    case savedViews of
+        savedView :: remainingSavedViews ->
+            if savedViewMatch savedView currentSavedView then
+                Just savedView
+
+            else
+                findMatchingSavedView currentSavedView remainingSavedViews
+
+        [] ->
+            Nothing
+
+
+currentView : ListSettings r -> SavedView
+currentView ls =
+    let
+        savedViewPlaceholder =
+            SavedView ls.filter ls.sort ls.tagsSelected ls.searchTerm Nothing
+    in
+    case findMatchingSavedView savedViewPlaceholder ls.savedViews of
+        Just savedView ->
+            savedView
+
+        Nothing ->
+            let
+                placeholderName =
+                    genUniqueSavedViewName ls (getSavedViewName savedViewPlaceholder)
+
+                savedViewPlaceholderWithUniqueName =
+                    { savedViewPlaceholder | title = Just placeholderName }
+            in
+            savedViewPlaceholderWithUniqueName
+
+
+currentViewIsSavedView : ListSettings r -> Bool
+currentViewIsSavedView ls =
+    List.any
+        (savedViewMatch <| currentView ls)
+        ls.savedViews
+
+
+getSavedViewName : SavedView -> String
+getSavedViewName savedView =
+    Maybe.withDefault
+        (Maybe.withDefault "SAVED VIEW" savedView.searchTerm)
+        savedView.title
+
+
+genUniqueSavedViewName : ListSettings r -> String -> String
+genUniqueSavedViewName ls savedViewName =
+    let
+        savedViewNames =
+            List.map (\x -> getSavedViewName x) ls.savedViews
+    in
+    if List.member savedViewName savedViewNames then
+        recurGenUniqueSavedViewName 1 savedViewNames savedViewName
+
+    else
+        savedViewName
+
+
+recurGenUniqueSavedViewName : Int -> List String -> String -> String
+recurGenUniqueSavedViewName count savedViewNames savedViewName =
+    let
+        iteratedSavedViewName =
+            savedViewName ++ " (" ++ String.fromInt count ++ ")"
+    in
+    if List.member iteratedSavedViewName savedViewNames then
+        recurGenUniqueSavedViewName (count + 1) savedViewNames savedViewName
+
+    else
+        iteratedSavedViewName
+
+
 type alias ListSettings r =
     { r
         | filter : ListFilter
         , sort : ListSort
-        , tagsSelected : ( Set String, Set String )
+        , tagsSelected : ( Int, Int )
         , searchTerm : Maybe String
+        , savedViews : List SavedView
+        , tagSettings : BitFlags.BitFlagSettings
     }
 
 
@@ -44,16 +290,6 @@ updateListFilter listSettings filterSetting =
     { listSettings | filter = filterSetting }
 
 
-resetFilter : ListSettings r -> ListSettings r
-resetFilter listSettings =
-    { listSettings
-        | filter = FilterAll
-        , sort = NoSort DESC
-        , tagsSelected = ( Set.empty, Set.empty )
-        , searchTerm = Nothing
-    }
-
-
 updateSort : ListSort -> ListSettings r -> ListSettings r
 updateSort listSort listSettings =
     { listSettings | sort = listSort }
@@ -62,28 +298,41 @@ updateSort listSort listSettings =
 toggleTag : String -> ListSettings r -> ListSettings r
 toggleTag tag listSettings =
     let
-        ( whitelistTags, blacklistTags ) =
+        ( whitelistRegister, blacklistRegister ) =
             listSettings.tagsSelected
 
+        getEnabledFlags =
+            listSettings.tagSettings
+                |> BitFlags.enabledFlags
+
+        ( whitelistTags, blacklistTags ) =
+            ( getEnabledFlags whitelistRegister
+            , getEnabledFlags blacklistRegister
+            )
+
         whitelistMember =
-            Set.member tag whitelistTags
+            List.member tag whitelistTags
 
         blacklistMember =
-            Set.member tag blacklistTags
+            List.member tag blacklistTags
+
+        flipTag =
+            listSettings.tagSettings
+                |> BitFlags.flipFlag
     in
     case ( whitelistMember, blacklistMember ) of
         ( False, False ) ->
-            { listSettings | tagsSelected = ( Set.insert tag whitelistTags, blacklistTags ) }
+            { listSettings | tagsSelected = ( flipTag tag whitelistRegister, blacklistRegister ) }
 
         ( True, False ) ->
-            { listSettings | tagsSelected = ( Set.remove tag whitelistTags, Set.insert tag blacklistTags ) }
+            { listSettings | tagsSelected = ( flipTag tag whitelistRegister, flipTag tag blacklistRegister ) }
 
         ( False, True ) ->
-            { listSettings | tagsSelected = ( whitelistTags, Set.remove tag blacklistTags ) }
+            { listSettings | tagsSelected = ( whitelistRegister, flipTag tag blacklistRegister ) }
 
         -- revisit this to make impossible states impossible
         ( True, True ) ->
-            { listSettings | tagsSelected = ( Set.remove tag whitelistTags, Set.remove tag blacklistTags ) }
+            { listSettings | tagsSelected = ( flipTag tag blacklistRegister, flipTag tag blacklistRegister ) }
 
 
 toggleSortOrder : ListSettings r -> ListSettings r
@@ -302,11 +551,17 @@ filterToQueryParam listFilter =
 generateQueryParams : ListSettings r -> String
 generateQueryParams listSettings =
     let
-        ( whitelist, blacklist ) =
+        ( whitelistRegister, blacklistRegister ) =
             listSettings.tagsSelected
 
+        showEnabledTags =
+            listSettings.tagSettings
+                |> BitFlags.enabledFlags
+
         ( whitelistStr, blacklistStr ) =
-            ( String.join "," (Set.toList whitelist), String.join "," (Set.toList blacklist) )
+            ( String.join "," (showEnabledTags whitelistRegister)
+            , String.join "," (showEnabledTags blacklistRegister)
+            )
 
         buildIfNotDefault defaultVal val builder acc =
             if defaultVal == val then
@@ -322,8 +577,8 @@ generateQueryParams listSettings =
                 |> buildIfNotDefault (NoSort DESC) listSettings.sort (Builder.string "order" sortOrder)
                 |> buildIfNotDefault FilterAll listSettings.filter (Builder.string "filter" (filterToQueryParam listSettings.filter))
                 |> buildIfNotDefault Nothing listSettings.searchTerm (Builder.string "q" (Maybe.withDefault "" listSettings.searchTerm))
-                |> buildIfNotDefault Set.empty whitelist (Builder.string "whitelist" whitelistStr)
-                |> buildIfNotDefault Set.empty blacklist (Builder.string "blacklist" blacklistStr)
+                |> buildIfNotDefault 0 whitelistRegister (Builder.string "whitelist" whitelistStr)
+                |> buildIfNotDefault 0 blacklistRegister (Builder.string "blacklist" blacklistStr)
                 |> Builder.toQuery
 
 
@@ -411,12 +666,14 @@ initListSettingsFromQueryParams url listSettings =
 
         selectedTags =
             Url.Parser.parse selectedTagsParser url
+                |> Maybe.withDefault ( Set.empty, Set.empty )
+                |> (\( a, b ) -> ( BitFlags.genRegister listSettings.tagSettings a, BitFlags.genRegister listSettings.tagSettings b ))
     in
     { listSettings
         | sort = Maybe.withDefault (NoSort DESC) sort
         , filter = Maybe.withDefault FilterAll filter
         , searchTerm = Maybe.withDefault Nothing search
-        , tagsSelected = Maybe.withDefault ( Set.empty, Set.empty ) selectedTags
+        , tagsSelected = selectedTags
     }
 
 
