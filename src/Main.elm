@@ -127,29 +127,7 @@ type alias Model =
     , lastCacheCheckAt : Time.Posix
     , cacheDigestChangedCount : Int
     , receivedCurrentTimeAt : Time.Posix
-    , dataBootstrapFlow : DataBootstrapFlow
     }
-
-
-type DataBootstrapFlow
-    = StartPoint
-    | DemoDataBootstrapFlow
-    | ProdDataBootstrapFlow
-    | DataBootstrapComplete
-
-
-type DemoDataBootstrapFlow
-    = DemoStartPoint
-    | DemoLogin
-    | DemoDataLoaded
-
-
-type ProdDataBootstrapFlow
-    = ProdStartPoint
-    | LocalStoreChecked
-    | UserDataLoaded
-    | TasksLoaded
-    | QueryParamsInitialized
 
 
 type alias EditingNotes =
@@ -433,7 +411,6 @@ initWithMaybeNavKey ( currentTimeinMillis, validAuth ) url maybeKey =
             , lastCacheCheckAt = currentTime
             , receivedCurrentTimeAt = currentTime
             , cacheDigestChangedCount = 0
-            , dataBootstrapFlow = StartPoint
             }
     in
     ( model
@@ -1039,6 +1016,7 @@ update msg rawModel =
             )
                 |> processTags encodedUserData
                 |> processSavedViews encodedUserData
+                |> (\( m, lc ) -> ( m, updateCacheDigest (generateCacheDigest m.tasks m) :: lc ))
                 |> processCacheDigest encodedUserData
                 |> maybeUpdateQueryParams
                 |> batchCmdList
