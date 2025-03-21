@@ -38,8 +38,12 @@ suite =
             , fragment = Nothing
             }
 
-        ( testModel, _ ) =
+        ( rawTestModel, _ ) =
             initWithMaybeNavKey ( 1711211815576, True ) url Nothing
+
+        ( testModel, _ ) =
+            ( { rawTestModel | tagResourcesLoaded = True, savedViewResourcesLoaded = True }, [] )
+                |> maybeUpdateQueryParams
 
         fallOrdinal =
             280

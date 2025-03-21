@@ -481,6 +481,49 @@ type Msg
     | NoOp
 
 
+maybeUpdateQueryParams : ( Model, List (Cmd Msg) ) -> ( Model, List (Cmd Msg) )
+maybeUpdateQueryParams ( m, lc ) =
+    -- if the dependent resources are loaded and we have yet to perform an initial load of query params,
+    -- go ahead and perform the initial load, then repeat function to proceed with query param update
+    if
+        m.savedViewResourcesLoaded
+            && m.tagResourcesLoaded
+            && not m.listSettingsAlreadyInitializedFromQueryParams
+    then
+        let
+            modelWithInitializedQueryParams =
+                initListSettingsFromQueryParams m.url m
+        in
+        maybeUpdateQueryParams
+            ( { modelWithInitializedQueryParams
+                | listSettingsAlreadyInitializedFromQueryParams = True
+              }
+            , lc
+            )
+
+    else if m.listSettingsAlreadyInitializedFromQueryParams then
+        case m.maybeKey of
+            Just key ->
+                let
+                    oldQueryString =
+                        m.url.query
+
+                    newQueryString =
+                        generateQueryParams m
+                in
+                if Maybe.withDefault "" oldQueryString /= newQueryString then
+                    ( m, Nav.replaceUrl key ("/" ++ newQueryString) :: lc )
+
+                else
+                    ( m, lc )
+
+            Nothing ->
+                ( m, lc )
+
+    else
+        ( m, lc )
+
+
 update : Msg -> Model -> ( Model, Cmd Msg )
 update msg rawModel =
     let
@@ -551,48 +594,6 @@ update msg rawModel =
                     Date.fromPosix m.currentZone m.receivedCurrentTimeAt
             in
             ( { m | currentDate = newDate }, lc )
-
-        maybeUpdateQueryParams : ( Model, List (Cmd Msg) ) -> ( Model, List (Cmd Msg) )
-        maybeUpdateQueryParams ( m, lc ) =
-            -- if the dependent resources are loaded and we have yet to perform an initial load of query params,
-            -- go ahead and perform the initial load, then repeat function to proceed with query param update
-            if
-                m.savedViewResourcesLoaded
-                    && m.tagResourcesLoaded
-                    && not m.listSettingsAlreadyInitializedFromQueryParams
-            then
-                let
-                    modelWithInitializedQueryParams =
-                        initListSettingsFromQueryParams m.url m
-                in
-                maybeUpdateQueryParams
-                    ( { modelWithInitializedQueryParams
-                        | listSettingsAlreadyInitializedFromQueryParams = True
-                      }
-                    , lc
-                    )
-
-            else if m.listSettingsAlreadyInitializedFromQueryParams then
-                case m.maybeKey of
-                    Just key ->
-                        let
-                            oldQueryString =
-                                m.url.query
-
-                            newQueryString =
-                                generateQueryParams m
-                        in
-                        if Maybe.withDefault "" oldQueryString /= newQueryString then
-                            ( m, Nav.replaceUrl key ("/" ++ newQueryString) :: lc )
-
-                        else
-                            ( m, lc )
-
-                    Nothing ->
-                        ( m, lc )
-
-            else
-                ( m, lc )
 
         processSavedViews : Decode.Value -> ( Model, List (Cmd Msg) ) -> ( Model, List (Cmd Msg) )
         processSavedViews jsonSavedViews ( m, lc ) =
