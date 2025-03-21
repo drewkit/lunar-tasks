@@ -127,7 +127,29 @@ type alias Model =
     , lastCacheCheckAt : Time.Posix
     , cacheDigestChangedCount : Int
     , receivedCurrentTimeAt : Time.Posix
+    , dataBootstrapFlow : DataBootstrapFlow
     }
+
+
+type DataBootstrapFlow
+    = StartPoint
+    | DemoDataBootstrapFlow
+    | ProdDataBootstrapFlow
+    | DataBootstrapComplete
+
+
+type DemoDataBootstrapFlow
+    = DemoStartPoint
+    | DemoLogin
+    | DemoDataLoaded
+
+
+type ProdDataBootstrapFlow
+    = ProdStartPoint
+    | LocalStoreChecked
+    | UserDataLoaded
+    | TasksLoaded
+    | QueryParamsInitialized
 
 
 type alias EditingNotes =
@@ -335,6 +357,7 @@ init flags url key =
 initWithMaybeNavKey : Flags -> Url -> Maybe Nav.Key -> ( Model, Cmd Msg )
 initWithMaybeNavKey ( currentTimeinMillis, validAuth ) url maybeKey =
     let
+        -- kick off login msg if we know we have a pre-existing valid pb authentication
         loginCmd =
             if validAuth then
                 userLoginAction "login"
@@ -410,6 +433,7 @@ initWithMaybeNavKey ( currentTimeinMillis, validAuth ) url maybeKey =
             , lastCacheCheckAt = currentTime
             , receivedCurrentTimeAt = currentTime
             , cacheDigestChangedCount = 0
+            , dataBootstrapFlow = StartPoint
             }
     in
     ( model
@@ -554,7 +578,7 @@ update msg rawModel =
         maybeUpdateQueryParams : ( Model, List (Cmd Msg) ) -> ( Model, List (Cmd Msg) )
         maybeUpdateQueryParams ( m, lc ) =
             -- if the dependent resources are loaded and we have yet to perform an initial load of query params,
-            -- go ahead and perform the initial load, then repeat function
+            -- go ahead and perform the initial load, then repeat function to proceed with query param update
             if
                 m.savedViewResourcesLoaded
                     && m.tagResourcesLoaded
@@ -571,7 +595,7 @@ update msg rawModel =
                     , lc
                     )
 
-            else
+            else if m.listSettingsAlreadyInitializedFromQueryParams then
                 case m.maybeKey of
                     Just key ->
                         let
@@ -589,6 +613,9 @@ update msg rawModel =
 
                     Nothing ->
                         ( m, lc )
+
+            else
+                ( m, lc )
 
         processSavedViews : Decode.Value -> ( Model, List (Cmd Msg) ) -> ( Model, List (Cmd Msg) )
         processSavedViews jsonSavedViews ( m, lc ) =
@@ -677,6 +704,9 @@ update msg rawModel =
                             currentCacheDigest =
                                 generateCacheDigest m.tasks model
                         in
+                        -- if current local cache digest includes tag and saved view data
+                        -- just received from user record, so presumably a fresh pull of tasks
+                        -- is the only resource component required.
                         if backendCacheDigest /= currentCacheDigest then
                             let
                                 newCacheDigestChangedCount =
@@ -686,7 +716,7 @@ update msg rawModel =
                                 | lastCacheCheckAt = model.receivedCurrentTimeAt
                                 , cacheDigestChangedCount = newCacheDigestChangedCount
                               }
-                            , fetchUserData :: lc
+                            , fetchTasks :: lc
                             )
 
                         else
@@ -700,8 +730,8 @@ update msg rawModel =
             else
                 ( m, lc )
 
-        fetchCacheDigestIfXMinutesSinceCheck : Int -> ( Model, List (Cmd Msg) ) -> ( Model, List (Cmd Msg) )
-        fetchCacheDigestIfXMinutesSinceCheck minutes ( m, lc ) =
+        fetchUserDataIfXMinutesSinceCacheDigestCheck : Int -> ( Model, List (Cmd Msg) ) -> ( Model, List (Cmd Msg) )
+        fetchUserDataIfXMinutesSinceCacheDigestCheck minutes ( m, lc ) =
             let
                 timeSinceLastCacheCheck =
                     Time.posixToMillis m.receivedCurrentTimeAt - Time.posixToMillis m.lastCacheCheckAt
@@ -1054,14 +1084,14 @@ update msg rawModel =
         ReceivedCurrentTime time ->
             ( { model | receivedCurrentTimeAt = time }, [] )
                 |> adjustDate
-                |> fetchCacheDigestIfXMinutesSinceCheck 20
+                |> fetchUserDataIfXMinutesSinceCacheDigestCheck 20
                 |> batchCmdList
 
         VisibilityChanged visibility ->
             case visibility of
                 Visible ->
                     ( model, [] )
-                        |> fetchCacheDigestIfXMinutesSinceCheck 5
+                        |> fetchUserDataIfXMinutesSinceCacheDigestCheck 5
                         |> batchCmdList
 
                 Hidden ->
@@ -1133,12 +1163,17 @@ update msg rawModel =
                     ( { model | banner = Decode.errorToString err }, Cmd.none )
 
         LogOutUser _ ->
-            ( { model | savedViews = [] }
-                |> resetLoginAttributes
+            ( model
                 |> setSavedView defaultSavedView
             , [ localStoreAction ( "clear", Encode.null ) ]
             )
                 |> maybeUpdateQueryParams
+                |> (\( m, lc ) ->
+                        ( m
+                            |> resetLoginAttributes
+                        , lc
+                        )
+                   )
                 |> batchCmdList
 
         DemoLoginUser _ ->
@@ -1157,6 +1192,8 @@ update msg rawModel =
                 , tagSettings =
                     Result.withDefault (BitFlags.defaultSettings 25) flagSettingsResult
                 , savedViewResourcesLoaded = True
+                , tagResourcesLoaded = True
+                , listSettingsAlreadyInitializedFromQueryParams = True
               }
             , Cmd.batch
                 [ Http.get { url = "/demo-data.json", expect = Http.expectString LoadDemo }
