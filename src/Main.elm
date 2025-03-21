@@ -380,7 +380,7 @@ initWithMaybeNavKey ( currentTimeinMillis, validAuth ) url maybeKey =
             , sort = NoSort DESC
 
             -- tags selected will be overridden on init with default saved view
-            , tagsSelected = ( 1, 0 )
+            , tagsSelected = ( 0, 0 )
             , tagSettings = BitFlags.defaultSettings 25
 
             -- search term will be overridden on init with default saved view
@@ -434,7 +434,6 @@ type Msg
     | SelectTagToEdit (Maybe String)
     | DeleteTag String
     | UpdatedTagNameInput String
-    | CompareCacheDigest Decode.Value
     | CreateTag
     | UpdateTag String
     | Search String
@@ -451,6 +450,7 @@ type Msg
     | SavedViewUpdateTitle
     | SavedViewUpdated Decode.Value
     | FilterReset
+    | UserDataFetched Decode.Value
     | LocalStoreFetched Decode.Value
     | ToggleSortOrder
     | ToggleNoteEdit
@@ -469,8 +469,6 @@ type Msg
     | VisibilityChanged Visibility
     | LogOutUser Int
     | LoadTasks Decode.Value
-    | LoadTags Decode.Value
-    | LoadSavedViews Decode.Value
     | LoginUser Int
     | DemoLoginUser Int
     | LoadDemo (Result Http.Error String)
@@ -528,25 +526,17 @@ update msg rawModel =
         fetchTasks =
             taskAction ( "fetch", Encode.null )
 
-        fetchTags : Cmd msg
-        fetchTags =
-            userActions ( "fetchTags", model.taskOwner, Encode.null )
-
         updateTags : Encode.Value -> Cmd msg
         updateTags encodedTags =
             userActions ( "updateTags", model.taskOwner, encodedTags )
 
-        fetchSavedViews : Cmd msg
-        fetchSavedViews =
-            userActions ( "fetchSavedViews", model.taskOwner, Encode.null )
+        fetchUserData : Cmd msg
+        fetchUserData =
+            userActions ( "fetchUserData", model.taskOwner, Encode.null )
 
         updateSavedViews : Encode.Value -> Cmd msg
         updateSavedViews encodedSavedViews =
             userActions ( "updateSavedViews", model.taskOwner, encodedSavedViews )
-
-        fetchCacheDigest : Cmd msg
-        fetchCacheDigest =
-            userActions ( "fetchCacheDigest", model.taskOwner, Encode.null )
 
         updateCacheDigest : String -> Cmd msg
         updateCacheDigest newDigest =
@@ -563,6 +553,8 @@ update msg rawModel =
 
         maybeUpdateQueryParams : ( Model, List (Cmd Msg) ) -> ( Model, List (Cmd Msg) )
         maybeUpdateQueryParams ( m, lc ) =
+            -- if the dependent resources are loaded and we have yet to perform an initial load of query params,
+            -- go ahead and perform the initial load, then repeat function
             if
                 m.savedViewResourcesLoaded
                     && m.tagResourcesLoaded
@@ -598,6 +590,116 @@ update msg rawModel =
                     Nothing ->
                         ( m, lc )
 
+        processSavedViews : Decode.Value -> ( Model, List (Cmd Msg) ) -> ( Model, List (Cmd Msg) )
+        processSavedViews jsonSavedViews ( m, lc ) =
+            let
+                savedViewsDecoder =
+                    Decode.at [ "savedViews" ] <|
+                        Decode.oneOf [ Decode.list savedViewDecoder, Decode.null [] ]
+            in
+            case Decode.decodeValue savedViewsDecoder jsonSavedViews of
+                Ok savedViews ->
+                    let
+                        modelWithLoadedSavedViews =
+                            { m | savedViews = savedViews, savedViewResourcesLoaded = True }
+                    in
+                    ( modelWithLoadedSavedViews
+                    , lc
+                    )
+
+                Err errMsg ->
+                    ( { m
+                        | banner = errorToString errMsg
+                      }
+                    , lc
+                    )
+
+        processTags : Decode.Value -> ( Model, List (Cmd Msg) ) -> ( Model, List (Cmd Msg) )
+        processTags jsonTags ( m, lc ) =
+            let
+                updateDecoder =
+                    Decode.at [ "tags" ] <|
+                        Decode.oneOf [ Decode.list Decode.string, Decode.null [] ]
+
+                fetchDecoder =
+                    Decode.at [ "items" ] <|
+                        Decode.index 0 <|
+                            Decode.at [ "tags" ] <|
+                                Decode.oneOf [ Decode.list Decode.string, Decode.null [] ]
+            in
+            case
+                Decode.decodeValue
+                    (Decode.oneOf
+                        [ fetchDecoder
+                        , updateDecoder
+                        ]
+                    )
+                    jsonTags
+            of
+                Ok tags ->
+                    let
+                        modelWithLoadedTags =
+                            { m
+                                | tagSettings =
+                                    Result.withDefault
+                                        m.tagSettings
+                                        (BitFlags.initSettings { bitLimit = 25, flags = tags })
+                                , tagResourcesLoaded = True
+                            }
+                    in
+                    ( modelWithLoadedTags
+                    , lc
+                    )
+
+                Err errMsg ->
+                    ( { m
+                        | banner = errorToString errMsg
+                      }
+                    , lc
+                    )
+
+        processCacheDigest : Decode.Value -> ( Model, List (Cmd Msg) ) -> ( Model, List (Cmd Msg) )
+        processCacheDigest jsonUser ( m, lc ) =
+            let
+                digestCacheDecoder =
+                    Decode.at [ "cacheDigest" ] <|
+                        Decode.string
+            in
+            if
+                m.tagResourcesLoaded
+                    && m.savedViewResourcesLoaded
+                    && m.listSettingsAlreadyInitializedFromQueryParams
+                    && (m.cacheDigestChangedCount < 200)
+            then
+                case Decode.decodeValue digestCacheDecoder jsonUser of
+                    Ok backendCacheDigest ->
+                        let
+                            currentCacheDigest =
+                                generateCacheDigest m.tasks model
+                        in
+                        if backendCacheDigest /= currentCacheDigest then
+                            let
+                                newCacheDigestChangedCount =
+                                    model.cacheDigestChangedCount + 1
+                            in
+                            ( { m
+                                | lastCacheCheckAt = model.receivedCurrentTimeAt
+                                , cacheDigestChangedCount = newCacheDigestChangedCount
+                              }
+                            , fetchUserData :: lc
+                            )
+
+                        else
+                            ( { m | lastCacheCheckAt = model.receivedCurrentTimeAt }
+                            , lc
+                            )
+
+                    Err _ ->
+                        ( m, lc )
+
+            else
+                ( m, lc )
+
         fetchCacheDigestIfXMinutesSinceCheck : Int -> ( Model, List (Cmd Msg) ) -> ( Model, List (Cmd Msg) )
         fetchCacheDigestIfXMinutesSinceCheck minutes ( m, lc ) =
             let
@@ -606,7 +708,7 @@ update msg rawModel =
             in
             -- fetch current cache digest record on backend every X minutes
             if timeSinceLastCacheCheck > (minutes * 60000) && not (isPresent m.demo) then
-                ( m, fetchCacheDigest :: lc )
+                ( m, fetchUserData :: lc )
 
             else
                 ( m, lc )
@@ -634,22 +736,19 @@ update msg rawModel =
                     update (LoadTasks data.payload) model
 
                 "tagsFetched" ->
-                    update (LoadTags data.payload) model
+                    update (UserDataFetched data.payload) model
 
                 "tagsUpdated" ->
-                    update (LoadTags data.payload) model
+                    update (UserDataFetched data.payload) model
 
                 "savedViewsUpdated" ->
-                    update (SavedViewUpdated data.payload) model
+                    update (UserDataFetched data.payload) model
 
-                "savedViewsFetched" ->
-                    update (LoadSavedViews data.payload) model
+                "userDataFetched" ->
+                    update (UserDataFetched data.payload) model
 
                 "localStoreFetched" ->
                     update (LocalStoreFetched data.payload) model
-
-                "cacheDigestFetched" ->
-                    update (CompareCacheDigest data.payload) model
 
                 unknownMessage ->
                     update (LoadTasks Encode.null) { model | banner = "Recv data unrecognized: " ++ unknownMessage }
@@ -672,46 +771,6 @@ update msg rawModel =
 
                 Nothing ->
                     ( { model | view = LoadedTasksView (TagSettingsView Nothing), tagNameInput = "" }, Cmd.none )
-
-        CompareCacheDigest jsonUser ->
-            let
-                digestCacheDecoder =
-                    Decode.at [ "cacheDigest" ] <|
-                        Decode.string
-            in
-            if
-                model.tagResourcesLoaded
-                    && model.savedViewResourcesLoaded
-                    && model.listSettingsAlreadyInitializedFromQueryParams
-            then
-                case Decode.decodeValue digestCacheDecoder jsonUser of
-                    Ok backendCacheDigest ->
-                        let
-                            currentCacheDigest =
-                                generateCacheDigest model.tasks model
-                        in
-                        if backendCacheDigest /= currentCacheDigest then
-                            let
-                                newCacheDigestChangedCount =
-                                    model.cacheDigestChangedCount + 1
-                            in
-                            ( { model
-                                | lastCacheCheckAt = model.receivedCurrentTimeAt
-                                , cacheDigestChangedCount = newCacheDigestChangedCount
-                              }
-                            , Cmd.batch [ fetchTasks, fetchTags, fetchSavedViews ]
-                            )
-
-                        else
-                            ( { model | lastCacheCheckAt = model.receivedCurrentTimeAt }
-                            , Cmd.none
-                            )
-
-                    Err _ ->
-                        ( model, Cmd.none )
-
-            else
-                ( model, Cmd.none )
 
         CreateTag ->
             let
@@ -944,6 +1003,16 @@ update msg rawModel =
         ViewChange viewType ->
             ( { model | view = viewType }, Cmd.none )
 
+        UserDataFetched encodedUserData ->
+            ( model
+            , []
+            )
+                |> processTags encodedUserData
+                |> processSavedViews encodedUserData
+                |> processCacheDigest encodedUserData
+                |> maybeUpdateQueryParams
+                |> batchCmdList
+
         MarkTaskCompleted task entryDate ->
             let
                 jsonTaskMarkedCompleted =
@@ -1064,7 +1133,11 @@ update msg rawModel =
                     ( { model | banner = Decode.errorToString err }, Cmd.none )
 
         LogOutUser _ ->
-            ( model |> resetLoginAttributes |> setSavedView defaultSavedView, [ localStoreAction ( "clear", Encode.null ) ] )
+            ( { model | savedViews = [] }
+                |> resetLoginAttributes
+                |> setSavedView defaultSavedView
+            , [ localStoreAction ( "clear", Encode.null ) ]
+            )
                 |> maybeUpdateQueryParams
                 |> batchCmdList
 
@@ -1084,7 +1157,6 @@ update msg rawModel =
                 , tagSettings =
                     Result.withDefault (BitFlags.defaultSettings 25) flagSettingsResult
                 , savedViewResourcesLoaded = True
-                , listSettingsAlreadyInitializedFromQueryParams = True
               }
             , Cmd.batch
                 [ Http.get { url = "/demo-data.json", expect = Http.expectString LoadDemo }
@@ -1166,82 +1238,6 @@ update msg rawModel =
                     , Cmd.none
                     )
 
-        LoadSavedViews jsonSavedViews ->
-            let
-                savedViewsDecoder =
-                    Decode.at [ "savedViews" ] <|
-                        Decode.oneOf [ Decode.list savedViewDecoder, Decode.null [] ]
-            in
-            case Decode.decodeValue savedViewsDecoder jsonSavedViews of
-                Ok savedViews ->
-                    let
-                        modelWithLoadedSavedViews =
-                            { model | savedViews = savedViews, savedViewResourcesLoaded = True }
-                    in
-                    ( modelWithLoadedSavedViews
-                    , [ localStoreAction ( "set", localStoreEncoder modelWithLoadedSavedViews )
-                      ]
-                    )
-                        |> maybeUpdateQueryParams
-                        |> batchCmdList
-
-                Err errMsg ->
-                    ( { model
-                        | banner = errorToString errMsg
-                      }
-                    , Cmd.none
-                    )
-
-        LoadTags jsonTags ->
-            let
-                updateDecoder =
-                    Decode.at [ "tags" ] <|
-                        Decode.oneOf [ Decode.list Decode.string, Decode.null [] ]
-
-                fetchDecoder =
-                    Decode.at [ "items" ] <|
-                        Decode.index 0 <|
-                            Decode.at [ "tags" ] <|
-                                Decode.oneOf [ Decode.list Decode.string, Decode.null [] ]
-            in
-            case
-                Decode.decodeValue
-                    (Decode.oneOf
-                        [ fetchDecoder
-                        , updateDecoder
-                        ]
-                    )
-                    jsonTags
-            of
-                Ok tags ->
-                    let
-                        modelWithLoadedTags =
-                            { model
-                                | tagSettings =
-                                    Result.withDefault
-                                        model.tagSettings
-                                        (BitFlags.initSettings { bitLimit = 25, flags = tags })
-                                , tagResourcesLoaded = True
-                            }
-                    in
-                    ( modelWithLoadedTags
-                    , [ -- inform backend of current cached state
-                        updateCacheDigest <| generateCacheDigest model.tasks modelWithLoadedTags
-
-                      -- update local store
-                      , localStoreAction ( "set", localStoreEncoder modelWithLoadedTags )
-                      ]
-                    )
-                        |> maybeUpdateQueryParams
-                        |> batchCmdList
-
-                Err errMsg ->
-                    ( { model
-                        | banner = errorToString errMsg
-                      }
-                    , Cmd.none
-                    )
-
         ProcessDownKeys rawKey ->
             case Keyboard.anyKeyOriginal rawKey of
                 Just Escape ->
@@ -1262,19 +1258,31 @@ update msg rawModel =
                             , savedViewResourcesLoaded = True
                             , savedViews = localStore.savedViews
                           }
-                        , [ fetchCacheDigest ]
+                        , [ fetchUserData ]
                         )
                             |> maybeUpdateQueryParams
                             |> batchCmdList
 
                     else
-                        ( { model | banner = "taskOwner not matching with local store" }, Cmd.batch [ fetchTasks, fetchTags, fetchSavedViews, localStoreAction ( "clear", Encode.null ) ] )
+                        ( { model | banner = "taskOwner not matching with local store" }
+                        , Cmd.batch
+                            [ fetchTasks
+                            , fetchUserData
+                            , localStoreAction ( "clear", Encode.null )
+                            ]
+                        )
 
                 Err errMsg ->
-                    ( { model | banner = Decode.errorToString errMsg }, Cmd.batch [ fetchTasks, fetchTags, fetchSavedViews, localStoreAction ( "clear", Encode.null ) ] )
+                    ( { model | banner = Decode.errorToString errMsg }
+                    , Cmd.batch
+                        [ fetchTasks
+                        , fetchUserData
+                        , localStoreAction ( "clear", Encode.null )
+                        ]
+                    )
 
         UrlChanged url ->
-            ( { model | url = url }, Cmd.none )
+            ( { model | url = url, banner = "new url is " ++ Maybe.withDefault "" url.query }, Cmd.none )
 
         UrlRequest _ ->
             ( model, Cmd.none )
