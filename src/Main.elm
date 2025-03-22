@@ -13,7 +13,7 @@ import Element.Background as Background
 import Element.Border as Border
 import Element.Events exposing (onClick, onMouseEnter)
 import Element.Font as Font
-import Element.Input as Input exposing (OptionState(..), button)
+import Element.Input as Input exposing (Label, OptionState(..), button)
 import FeatherIcons as Icon exposing (Icon, key)
 import Html exposing (Html, td, th, tr)
 import Html.Attributes exposing (style, type_, value)
@@ -246,35 +246,6 @@ authStoreTaskOwnerEncoder id =
 
 
 -- MISC DEFAULT SETTINGS
-
-
-type alias LoginAttributes r =
-    { r
-        | tasks : List LunarTask
-        , taskOwner : String
-        , view : ViewState
-        , demo : Maybe { demoId : Int }
-        , tagSettings : BitFlagSettings
-        , banner : String
-        , tagResourcesLoaded : Bool
-        , savedViewResourcesLoaded : Bool
-        , listSettingsAlreadyInitializedFromQueryParams : Bool
-    }
-
-
-resetLoginAttributes : LoginAttributes r -> LoginAttributes r
-resetLoginAttributes attrs =
-    { attrs
-        | tasks = []
-        , demo = Nothing
-        , taskOwner = ""
-        , view = LoginPromptView
-        , tagSettings = BitFlags.defaultSettings 25
-        , banner = ""
-        , tagResourcesLoaded = False
-        , savedViewResourcesLoaded = False
-        , listSettingsAlreadyInitializedFromQueryParams = False
-    }
 
 
 datePickerSettings : DatePicker.Settings
@@ -1142,18 +1113,31 @@ update msg rawModel =
                     ( { model | banner = Decode.errorToString err }, Cmd.none )
 
         LogOutUser _ ->
-            ( model
-                |> setSavedView defaultSavedView
-            , [ localStoreAction ( "clear", Encode.null ) ]
-            )
-                |> maybeUpdateQueryParams
-                |> (\( m, lc ) ->
+            let
+                currentTime =
+                    Time.posixToMillis model.receivedCurrentTimeAt
+
+                resetUrl =
+                    case model.maybeKey of
+                        Just key ->
+                            Nav.replaceUrl key "/"
+
+                        Nothing ->
+                            Cmd.none
+            in
+            initWithMaybeNavKey ( currentTime, False ) model.url model.maybeKey
+                -- subscriptions already set from the first application init, so no need to reassert
+                -- but we will send out message to clear local storage as well as a message
+                -- to have the pb auth cleared
+                |> (\( m, _ ) ->
                         ( m
-                            |> resetLoginAttributes
-                        , lc
+                        , Cmd.batch
+                            [ localStoreAction ( "clear", Encode.null )
+                            , userLoginAction "logout"
+                            , resetUrl
+                            ]
                         )
                    )
-                |> batchCmdList
 
         DemoLoginUser _ ->
             let
