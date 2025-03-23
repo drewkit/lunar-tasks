@@ -34,8 +34,22 @@ savedViewEncoder savedView =
         , ( "sortOrder", Encode.string listSortOrder )
         , ( "tagsWhitelisted", Encode.int (Tuple.first savedView.tagsSelected) )
         , ( "tagsBlacklisted", Encode.int (Tuple.second savedView.tagsSelected) )
-        , ( "searchTerm", Encode.string (Maybe.withDefault "" savedView.searchTerm) )
-        , ( "title", Encode.string (Maybe.withDefault "" savedView.title) )
+        , ( "searchTerm"
+          , case savedView.searchTerm of
+                Just searchTerm ->
+                    Encode.string searchTerm
+
+                Nothing ->
+                    Encode.null
+          )
+        , ( "title"
+          , case savedView.title of
+                Just title ->
+                    Encode.string title
+
+                Nothing ->
+                    Encode.null
+          )
         ]
 
 
@@ -57,14 +71,14 @@ savedViewDecoder =
                 listFilter
                 (strToListSort sortOrder sortType)
                 ( whitelistTags, blacklistTags )
-                (Just searchTerm)
-                (Just title)
+                searchTerm
+                title
         )
         (Decode.field "filter" listFilterDecoder)
         (Decode.field "tagsWhitelisted" Decode.int)
         (Decode.field "tagsBlacklisted" Decode.int)
-        (Decode.field "title" Decode.string)
-        (Decode.field "searchTerm" Decode.string)
+        (Decode.field "title" (Decode.maybe Decode.string))
+        (Decode.field "searchTerm" (Decode.maybe Decode.string))
         (Decode.field "sortType" Decode.string)
         (Decode.field "sortOrder" sortOrderDecoder)
 
