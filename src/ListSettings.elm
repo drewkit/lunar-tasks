@@ -53,6 +53,20 @@ savedViewEncoder savedView =
         ]
 
 
+savedViewSearch : Maybe String -> List SavedView -> Maybe SavedView
+savedViewSearch savedViewTitle savedViews =
+    case savedViews of
+        savedView :: rest ->
+            if savedView.title == savedViewTitle then
+                Just savedView
+
+            else
+                savedViewSearch savedViewTitle rest
+
+        [] ->
+            Nothing
+
+
 filterToStr : ListFilter -> String
 filterToStr filter =
     filterToQueryParam filter
@@ -682,13 +696,31 @@ initListSettingsFromQueryParams url listSettings =
             Url.Parser.parse selectedTagsParser url
                 |> Maybe.withDefault ( Set.empty, Set.empty )
                 |> (\( a, b ) -> ( BitFlags.genRegister listSettings.tagSettings a, BitFlags.genRegister listSettings.tagSettings b ))
+
+        savedViewParser : Parser (Maybe String -> b) b
+        savedViewParser =
+            Url.Parser.top
+                <?> QueryParser.string "savedview"
+
+        maybeSavedView : Maybe SavedView
+        maybeSavedView =
+            Url.Parser.parse savedViewParser url
+                |> Maybe.andThen (\title -> savedViewSearch title listSettings.savedViews)
+
+        settingsWithoutSavedViewAsserted =
+            { listSettings
+                | sort = Maybe.withDefault (NoSort DESC) sort
+                , filter = Maybe.withDefault FilterAll filter
+                , searchTerm = Maybe.withDefault Nothing search
+                , tagsSelected = selectedTags
+            }
     in
-    { listSettings
-        | sort = Maybe.withDefault (NoSort DESC) sort
-        , filter = Maybe.withDefault FilterAll filter
-        , searchTerm = Maybe.withDefault Nothing search
-        , tagsSelected = selectedTags
-    }
+    case maybeSavedView of
+        Just savedView ->
+            setSavedView savedView listSettings
+
+        Nothing ->
+            settingsWithoutSavedViewAsserted
 
 
 

@@ -412,9 +412,7 @@ type Msg
     | ClearSearch
     | ClearBanner
     | SavedViewRemove
-      -- | SavedViewRemoved Decode.Value
     | SavedViewAdd
-      -- | SavedViewAdded Decode.Value
     | SavedViewDropdown (Dropdown.Msg SavedView)
     | SavedViewSelection (Maybe SavedView)
     | SavedViewEditTitle String
