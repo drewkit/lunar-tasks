@@ -232,14 +232,7 @@ currentView ls =
             savedView
 
         Nothing ->
-            let
-                placeholderName =
-                    genUniqueSavedViewName ls (getSavedViewName savedViewPlaceholder)
-
-                savedViewPlaceholderWithUniqueName =
-                    { savedViewPlaceholder | title = Just placeholderName }
-            in
-            savedViewPlaceholderWithUniqueName
+            savedViewPlaceholder
 
 
 currentViewIsSavedView : ListSettings r -> Bool
@@ -579,35 +572,44 @@ filterToQueryParam listFilter =
 generateQueryParams : ListSettings r -> String
 generateQueryParams listSettings =
     let
-        ( whitelistRegister, blacklistRegister ) =
-            listSettings.tagsSelected
-
-        showEnabledTags =
-            listSettings.tagSettings
-                |> BitFlags.enabledFlags
-
-        ( whitelistStr, blacklistStr ) =
-            ( String.join "," (showEnabledTags whitelistRegister)
-            , String.join "," (showEnabledTags blacklistRegister)
-            )
-
-        buildIfNotDefault defaultVal val builder acc =
-            if defaultVal == val then
-                acc
-
-            else
-                builder :: acc
+        viewTitle =
+            .title (currentView listSettings)
     in
-    case listSortToQueryParam listSettings.sort of
-        ( listSort, sortOrder ) ->
-            []
-                |> buildIfNotDefault (NoSort DESC) listSettings.sort (Builder.string "sort" listSort)
-                |> buildIfNotDefault (NoSort DESC) listSettings.sort (Builder.string "order" sortOrder)
-                |> buildIfNotDefault FilterAll listSettings.filter (Builder.string "filter" (filterToQueryParam listSettings.filter))
-                |> buildIfNotDefault Nothing listSettings.searchTerm (Builder.string "q" (Maybe.withDefault "" listSettings.searchTerm))
-                |> buildIfNotDefault 0 whitelistRegister (Builder.string "whitelist" whitelistStr)
-                |> buildIfNotDefault 0 blacklistRegister (Builder.string "blacklist" blacklistStr)
-                |> Builder.toQuery
+    case viewTitle of
+        Just title ->
+            Builder.toQuery [ Builder.string "savedview" title ]
+
+        Nothing ->
+            let
+                ( whitelistRegister, blacklistRegister ) =
+                    listSettings.tagsSelected
+
+                showEnabledTags =
+                    listSettings.tagSettings
+                        |> BitFlags.enabledFlags
+
+                ( whitelistStr, blacklistStr ) =
+                    ( String.join "," (showEnabledTags whitelistRegister)
+                    , String.join "," (showEnabledTags blacklistRegister)
+                    )
+
+                buildIfNotDefault defaultVal val builder acc =
+                    if defaultVal == val then
+                        acc
+
+                    else
+                        builder :: acc
+            in
+            case listSortToQueryParam listSettings.sort of
+                ( listSort, sortOrder ) ->
+                    []
+                        |> buildIfNotDefault (NoSort DESC) listSettings.sort (Builder.string "sort" listSort)
+                        |> buildIfNotDefault (NoSort DESC) listSettings.sort (Builder.string "order" sortOrder)
+                        |> buildIfNotDefault FilterAll listSettings.filter (Builder.string "filter" (filterToQueryParam listSettings.filter))
+                        |> buildIfNotDefault Nothing listSettings.searchTerm (Builder.string "q" (Maybe.withDefault "" listSettings.searchTerm))
+                        |> buildIfNotDefault 0 whitelistRegister (Builder.string "whitelist" whitelistStr)
+                        |> buildIfNotDefault 0 blacklistRegister (Builder.string "blacklist" blacklistStr)
+                        |> Builder.toQuery
 
 
 
