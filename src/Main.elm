@@ -282,7 +282,9 @@ savedViewDropdownConfig =
             , Background.color color.white
             ]
         |> Dropdown.withPromptElement (el [] <| text "-- Saved Views --")
-        |> Dropdown.withContainerAttributes [ pointer ]
+        |> Dropdown.withContainerAttributes
+            [ pointer
+            ]
 
 
 
@@ -411,14 +413,6 @@ type Msg
     | Search String
     | ClearSearch
     | ClearBanner
-    | SavedViewRemove
-    | SavedViewAdd
-    | SavedViewDropdown (Dropdown.Msg SavedView)
-    | SavedViewSelection (Maybe SavedView)
-    | SavedViewEditTitle String
-    | SavedViewUpdateTitleInput String
-    | SavedViewUpdateTitle
-    | SavedViewUpdated Decode.Value
     | FilterReset
     | UserDataFetched Decode.Value
     | LocalStoreFetched Decode.Value
@@ -430,6 +424,7 @@ type Msg
     | MarkTaskCompleted LunarTask Date.Date
     | NewTaskEffect NewTaskMsg
     | EditTaskEffect EditTaskMsg
+    | SavedViewEffect SavedViewMsg
     | DeleteTask LunarTask
     | ProcessDownKeys Keyboard.RawKey
     | AdjustTimeZone Time.Zone
@@ -810,147 +805,6 @@ update msg rawModel =
                 |> maybeUpdateQueryParams
                 |> batchCmdList
 
-        SavedViewAdd ->
-            let
-                updatedSavedViews =
-                    currentView model :: model.savedViews
-
-                encodedSavedViews =
-                    Encode.list savedViewEncoder updatedSavedViews
-            in
-            if isPresent model.demo then
-                ( { model | savedViews = updatedSavedViews }, Cmd.none )
-
-            else
-                ( model
-                , updateSavedViews encodedSavedViews
-                )
-
-        SavedViewRemove ->
-            let
-                updatedSavedViews =
-                    List.filter
-                        (\x ->
-                            x /= currentView model
-                        )
-                        model.savedViews
-
-                encodedSavedViews =
-                    Encode.list savedViewEncoder updatedSavedViews
-            in
-            if isPresent model.demo then
-                ( { model | savedViews = updatedSavedViews }, Cmd.none )
-
-            else
-                ( model
-                , updateSavedViews encodedSavedViews
-                )
-
-        SavedViewDropdown subMsg ->
-            let
-                ( updatedSavedViewDropdown, cmd ) =
-                    Dropdown.update
-                        savedViewDropdownConfig
-                        subMsg
-                        model
-                        model.savedViewDropdownState
-            in
-            ( { model | savedViewDropdownState = updatedSavedViewDropdown }, cmd )
-
-        SavedViewSelection maybeSavedView ->
-            case maybeSavedView of
-                Nothing ->
-                    ( model, Cmd.none )
-
-                Just savedView ->
-                    ( model
-                        |> setSavedView savedView
-                    , []
-                    )
-                        |> maybeUpdateQueryParams
-                        |> batchCmdList
-
-        SavedViewEditTitle previousTitle ->
-            ( { model
-                | savedViewTitleInput = previousTitle
-                , view =
-                    LoadedTasksView (MainTasksView EditSavedViewTitle)
-              }
-            , Cmd.none
-            )
-
-        SavedViewUpdateTitleInput title ->
-            ( { model | savedViewTitleInput = title }, Cmd.none )
-
-        SavedViewUpdateTitle ->
-            let
-                currentSavedView =
-                    currentView model
-
-                allButCurrentView =
-                    List.filter
-                        (\x -> not (savedViewMatch currentSavedView x))
-                        model.savedViews
-
-                newTitle =
-                    genUniqueSavedViewName
-                        { model | savedViews = allButCurrentView }
-                        model.savedViewTitleInput
-
-                updatedSavedViews =
-                    { currentSavedView
-                        | title = Just newTitle
-                    }
-                        :: allButCurrentView
-
-                encodedSavedViews =
-                    Encode.list savedViewEncoder updatedSavedViews
-            in
-            if isPresent model.demo then
-                ( { model
-                    | savedViewTitleInput = ""
-                    , view = LoadedTasksView (MainTasksView Normal)
-                    , savedViews =
-                        updatedSavedViews
-                  }
-                , Cmd.none
-                )
-
-            else
-                ( { model
-                    | savedViewTitleInput = ""
-                    , view = LoadedTasksView (MainTasksView Normal)
-                  }
-                , updateSavedViews encodedSavedViews
-                )
-
-        SavedViewUpdated jsonSavedViews ->
-            let
-                savedViewsDecoder =
-                    Decode.at [ "savedViews" ] <|
-                        Decode.oneOf [ Decode.list savedViewDecoder, Decode.null [] ]
-            in
-            case Decode.decodeValue savedViewsDecoder jsonSavedViews of
-                Ok savedViews ->
-                    let
-                        modelWithLoadedSavedViews =
-                            { model | savedViews = savedViews }
-                    in
-                    ( modelWithLoadedSavedViews
-                    , [ localStoreAction ( "set", localStoreEncoder modelWithLoadedSavedViews )
-                      , updateCacheDigest (generateCacheDigest modelWithLoadedSavedViews.tasks modelWithLoadedSavedViews)
-                      ]
-                    )
-                        |> maybeUpdateQueryParams
-                        |> batchCmdList
-
-                Err errMsg ->
-                    ( { model
-                        | banner = errorToString errMsg
-                      }
-                    , Cmd.none
-                    )
-
         ClearBanner ->
             ( { model | banner = "" }, Cmd.none )
 
@@ -1034,6 +888,9 @@ update msg rawModel =
                 |> adjustDate
                 |> fetchUserDataIfXMinutesSinceCacheDigestCheck 20
                 |> batchCmdList
+
+        SavedViewEffect savedViewMsg ->
+            updateSavedView savedViewMsg model
 
         VisibilityChanged visibility ->
             case visibility of
@@ -1699,6 +1556,162 @@ updateEditedTask editTaskMsg model =
                     )
 
 
+type SavedViewMsg
+    = SavedViewRemove
+    | SavedViewAdd
+    | SavedViewDropdown (Dropdown.Msg SavedView)
+    | SavedViewSelection (Maybe SavedView)
+    | SavedViewEditTitle String
+    | SavedViewUpdateTitleInput String
+    | SavedViewUpdateTitle
+    | SavedViewUpdated Decode.Value
+
+
+updateSavedView : SavedViewMsg -> Model -> ( Model, Cmd Msg )
+updateSavedView savedViewMsg model =
+    case savedViewMsg of
+        SavedViewAdd ->
+            let
+                updatedSavedViews =
+                    currentView model :: model.savedViews
+
+                encodedSavedViews =
+                    Encode.list savedViewEncoder updatedSavedViews
+            in
+            if isPresent model.demo then
+                ( { model | savedViews = updatedSavedViews }, Cmd.none )
+
+            else
+                ( model
+                , updateSavedViews encodedSavedViews
+                )
+
+        SavedViewRemove ->
+            let
+                updatedSavedViews =
+                    List.filter
+                        (\x ->
+                            x /= currentView model
+                        )
+                        model.savedViews
+
+                encodedSavedViews =
+                    Encode.list savedViewEncoder updatedSavedViews
+            in
+            if isPresent model.demo then
+                ( { model | savedViews = updatedSavedViews }, Cmd.none )
+
+            else
+                ( model
+                , updateSavedViews encodedSavedViews
+                )
+
+        SavedViewDropdown subMsg ->
+            let
+                ( updatedSavedViewDropdown, cmd ) =
+                    Dropdown.update
+                        savedViewDropdownConfig
+                        subMsg
+                        model
+                        model.savedViewDropdownState
+            in
+            ( { model | savedViewDropdownState = updatedSavedViewDropdown }, cmd )
+
+        SavedViewSelection maybeSavedView ->
+            case maybeSavedView of
+                Nothing ->
+                    ( model, Cmd.none )
+
+                Just savedView ->
+                    ( model
+                        |> setSavedView savedView
+                    , []
+                    )
+                        |> maybeUpdateQueryParams
+                        |> batchCmdList
+
+        SavedViewEditTitle previousTitle ->
+            ( { model
+                | savedViewTitleInput = previousTitle
+                , view =
+                    LoadedTasksView (MainTasksView EditSavedViewTitle)
+              }
+            , Cmd.none
+            )
+
+        SavedViewUpdateTitleInput title ->
+            ( { model | savedViewTitleInput = title }, Cmd.none )
+
+        SavedViewUpdateTitle ->
+            let
+                currentSavedView =
+                    currentView model
+
+                allButCurrentView =
+                    List.filter
+                        (\x -> not (savedViewMatch currentSavedView x))
+                        model.savedViews
+
+                newTitle =
+                    genUniqueSavedViewName
+                        { model | savedViews = allButCurrentView }
+                        model.savedViewTitleInput
+
+                updatedSavedViews =
+                    { currentSavedView
+                        | title = Just newTitle
+                    }
+                        :: allButCurrentView
+
+                encodedSavedViews =
+                    Encode.list savedViewEncoder updatedSavedViews
+            in
+            if isPresent model.demo then
+                ( { model
+                    | savedViewTitleInput = ""
+                    , view = LoadedTasksView (MainTasksView Normal)
+                    , savedViews =
+                        updatedSavedViews
+                  }
+                , Cmd.none
+                )
+
+            else
+                ( { model
+                    | savedViewTitleInput = ""
+                    , view = LoadedTasksView (MainTasksView Normal)
+                  }
+                , updateSavedViews encodedSavedViews
+                )
+
+        SavedViewUpdated jsonSavedViews ->
+            let
+                savedViewsDecoder =
+                    Decode.at [ "savedViews" ] <|
+                        Decode.oneOf [ Decode.list savedViewDecoder, Decode.null [] ]
+            in
+            case Decode.decodeValue savedViewsDecoder jsonSavedViews of
+                Ok savedViews ->
+                    let
+                        modelWithLoadedSavedViews =
+                            { model | savedViews = savedViews }
+                    in
+                    ( modelWithLoadedSavedViews
+                    , [ localStoreAction ( "set", localStoreEncoder modelWithLoadedSavedViews )
+                      , updateCacheDigest (generateCacheDigest modelWithLoadedSavedViews.tasks modelWithLoadedSavedViews)
+                      ]
+                    )
+                        |> maybeUpdateQueryParams
+                        |> batchCmdList
+
+                Err errMsg ->
+                    ( { model
+                        | banner = errorToString errMsg
+                      }
+                    , Cmd.none
+                    )
+
+
 
 -- VIEW
 
@@ -2189,7 +2202,7 @@ viewTask model editingNotes =
                                                 ++ Date.toIsoString end
 
                                         NextSeason start end ->
-                                            "This season starts on "
+                                            "Next season starts on "
                                                 ++ Date.toIsoString start
                                                 ++ " and ends on "
                                                 ++ Date.toIsoString end
