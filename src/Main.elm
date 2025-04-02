@@ -403,13 +403,7 @@ initWithMaybeNavKey ( currentTimeinMillis, validAuth ) url maybeKey =
 
 type Msg
     = Recv { tag : String, payload : Decode.Value }
-    | ToggleTag String
-    | EditTags
-    | SelectTagToEdit (Maybe String)
-    | DeleteTag String
-    | UpdatedTagNameInput String
-    | CreateTag
-    | UpdateTag String
+    | TagEffect TagMsg
     | Search String
     | ClearSearch
     | ClearBanner
@@ -429,7 +423,6 @@ type Msg
     | ProcessDownKeys Keyboard.RawKey
     | AdjustTimeZone Time.Zone
     | ReceivedCurrentTime Time.Posix
-    | TaskUpdated Decode.Value
     | TaskDeleted Decode.Value
     | VisibilityChanged Visibility
     | LogOutUser Int
@@ -543,10 +536,6 @@ update msg rawModel =
         fetchTasks : Cmd msg
         fetchTasks =
             taskAction ( "fetch", Encode.null )
-
-        updateTags : Encode.Value -> Cmd msg
-        updateTags encodedTags =
-            userActions ( "updateTags", model.taskOwner, encodedTags )
 
         fetchUserData : Cmd msg
         fetchUserData =
@@ -694,10 +683,10 @@ update msg rawModel =
                     update (UserLoggedIn data.payload) model
 
                 "taskCreated" ->
-                    update (TaskUpdated data.payload) model
+                    update (EditTaskEffect <| TaskUpdated data.payload) model
 
                 "taskUpdated" ->
-                    update (TaskUpdated data.payload) model
+                    update (EditTaskEffect <| TaskUpdated data.payload) model
 
                 "taskDeleted" ->
                     update (TaskDeleted data.payload) model
@@ -723,70 +712,11 @@ update msg rawModel =
                 unknownMessage ->
                     update (LoadTasks Encode.null) { model | banner = "Recv data unrecognized: " ++ unknownMessage }
 
-        ToggleTag tag ->
-            ( model |> toggleTag tag, [] )
-                |> maybeUpdateQueryParams
-                |> batchCmdList
+        TagEffect tagMsg ->
+            updateTag tagMsg model
 
         ToggleNoteEdit ->
             ( { model | view = toggleNoteEdit model.view }, Task.attempt (\_ -> NoOp) (Dom.focus "notes-input") )
-
-        EditTags ->
-            ( { model | view = LoadedTasksView (TagSettingsView Nothing) }, Cmd.none )
-
-        SelectTagToEdit maybeTagName ->
-            case maybeTagName of
-                Just tagName ->
-                    ( { model | view = LoadedTasksView (TagSettingsView (Just tagName)), tagNameInput = tagName }, Cmd.none )
-
-                Nothing ->
-                    ( { model | view = LoadedTasksView (TagSettingsView Nothing), tagNameInput = "" }, Cmd.none )
-
-        CreateTag ->
-            let
-                addedToTagSettings =
-                    BitFlags.createFlag model.tagNameInput model.tagSettings
-            in
-            if isPresent model.demo then
-                case addedToTagSettings of
-                    Ok updatedSettings ->
-                        ( { model | tagNameInput = "", tagSettings = updatedSettings }, Cmd.none )
-
-                    Err errMsg ->
-                        ( { model | banner = errMsg }, Cmd.none )
-
-            else
-                case addedToTagSettings of
-                    Ok updatedSettings ->
-                        ( { model | tagNameInput = "" }, updateTags <| Encode.list Encode.string (BitFlags.serialize updatedSettings) )
-
-                    Err errMsg ->
-                        ( { model | banner = errMsg }, Cmd.none )
-
-        UpdateTag oldName ->
-            let
-                updatedTagSettings =
-                    BitFlags.updateFlag oldName model.tagNameInput model.tagSettings
-            in
-            if isPresent model.demo then
-                ( { model | tagSettings = updatedTagSettings, view = LoadedTasksView (TagSettingsView Nothing) }, Cmd.none )
-
-            else
-                ( model, updateTags (Encode.list Encode.string (BitFlags.serialize updatedTagSettings)) )
-
-        DeleteTag tagName ->
-            let
-                updatedTagSettings =
-                    BitFlags.deleteFlag tagName model.tagSettings
-            in
-            if isPresent model.demo then
-                ( { model | tagSettings = updatedTagSettings, view = LoadedTasksView (TagSettingsView Nothing) }, Cmd.none )
-
-            else
-                ( model, updateTags (Encode.list Encode.string (BitFlags.serialize updatedTagSettings)) )
-
-        UpdatedTagNameInput updatedTagName ->
-            ( { model | tagNameInput = updatedTagName }, Cmd.none )
 
         SelectFilter filter ->
             ( model |> selectFilter filter, [] )
@@ -849,7 +779,7 @@ update msg rawModel =
                     lunarTaskEncoder <| markTaskCompleted task (Just entryDate)
             in
             if isPresent model.demo then
-                update (TaskUpdated jsonTaskMarkedCompleted) model
+                update (EditTaskEffect <| TaskUpdated jsonTaskMarkedCompleted) model
 
             else
                 let
@@ -923,49 +853,6 @@ update msg rawModel =
                           updateCacheDigest modelWithTaskRemoved (generateCacheDigest tasks modelWithTaskRemoved)
                         , -- update localStore
                           localStoreAction ( "set", localStoreEncoder modelWithTaskRemoved )
-                        ]
-                    )
-
-                Err err ->
-                    ( { model | banner = Decode.errorToString err }, Cmd.none )
-
-        TaskUpdated jsonTask ->
-            let
-                -- delay fn from https://stackoverflow.com/a/61324383
-                delay time delayMsg =
-                    -- create a task that sleeps for `time`
-                    Process.sleep time
-                        |> -- once the sleep is over, ignore its output (using `always`)
-                           -- and then we create a new task that simply returns a success, and the msg
-                           Task.andThen (always <| Task.succeed delayMsg)
-                        |> -- finally, we ask Elm to perform the Task, which
-                           -- takes the result of the above task and
-                           -- returns it to our update function
-                           Task.perform identity
-            in
-            case Decode.decodeValue lunarTaskDecoder jsonTask of
-                Ok task ->
-                    let
-                        tasks =
-                            insertOrUpdateTask task model.tasks
-
-                        modelWithUpdatedTask =
-                            { model | tasks = tasks }
-                    in
-                    ( { modelWithUpdatedTask
-                        | banner = "task \"" ++ task.title ++ "\" -- id  " ++ task.id ++ " touched by db"
-                      }
-                    , Cmd.batch
-                        [ delay 5000 ClearBanner
-
-                        -- event for incrementing demo id
-                        , Task.perform DemoIdTick Time.now
-
-                        -- report new state of task list to backend
-                        , updateCacheDigest modelWithUpdatedTask <| generateCacheDigest tasks modelWithUpdatedTask
-
-                        -- update localStore
-                        , localStoreAction ( "set", localStoreEncoder modelWithUpdatedTask )
                         ]
                     )
 
@@ -1224,12 +1111,93 @@ updateNewTask newTaskMsg model =
                     resetNewTask model
             in
             if isPresent model.demo then
-                update (TaskUpdated encodedJsonTask) modelWithNewTaskReset
+                update (EditTaskEffect <| TaskUpdated encodedJsonTask) modelWithNewTaskReset
 
             else
                 ( modelWithNewTaskReset
                 , createTask encodedJsonTask
                 )
+
+
+type TagMsg
+    = ToggleTag String
+    | EditTags
+    | SelectTagToEdit (Maybe String)
+    | DeleteTag String
+    | UpdatedTagNameInput String
+    | CreateTag
+    | UpdateTag String
+
+
+updateTag : TagMsg -> Model -> ( Model, Cmd Msg )
+updateTag msg model =
+    let
+        updateTags : Encode.Value -> Cmd msg
+        updateTags encodedTags =
+            userActions ( "updateTags", model.taskOwner, encodedTags )
+    in
+    case msg of
+        ToggleTag tag ->
+            ( model |> toggleTag tag, [] )
+                |> maybeUpdateQueryParams
+                |> batchCmdList
+
+        EditTags ->
+            ( { model | view = LoadedTasksView (TagSettingsView Nothing) }, Cmd.none )
+
+        SelectTagToEdit maybeTagName ->
+            case maybeTagName of
+                Just tagName ->
+                    ( { model | view = LoadedTasksView (TagSettingsView (Just tagName)), tagNameInput = tagName }, Cmd.none )
+
+                Nothing ->
+                    ( { model | view = LoadedTasksView (TagSettingsView Nothing), tagNameInput = "" }, Cmd.none )
+
+        DeleteTag tagName ->
+            let
+                updatedTagSettings =
+                    BitFlags.deleteFlag tagName model.tagSettings
+            in
+            if isPresent model.demo then
+                ( { model | tagSettings = updatedTagSettings, view = LoadedTasksView (TagSettingsView Nothing) }, Cmd.none )
+
+            else
+                ( model, updateTags (Encode.list Encode.string (BitFlags.serialize updatedTagSettings)) )
+
+        UpdatedTagNameInput updatedTagName ->
+            ( { model | tagNameInput = updatedTagName }, Cmd.none )
+
+        CreateTag ->
+            let
+                addedToTagSettings =
+                    BitFlags.createFlag model.tagNameInput model.tagSettings
+            in
+            if isPresent model.demo then
+                case addedToTagSettings of
+                    Ok updatedSettings ->
+                        ( { model | tagNameInput = "", tagSettings = updatedSettings }, Cmd.none )
+
+                    Err errMsg ->
+                        ( { model | banner = errMsg }, Cmd.none )
+
+            else
+                case addedToTagSettings of
+                    Ok updatedSettings ->
+                        ( { model | tagNameInput = "" }, updateTags <| Encode.list Encode.string (BitFlags.serialize updatedSettings) )
+
+                    Err errMsg ->
+                        ( { model | banner = errMsg }, Cmd.none )
+
+        UpdateTag oldName ->
+            let
+                updatedTagSettings =
+                    BitFlags.updateFlag oldName model.tagNameInput model.tagSettings
+            in
+            if isPresent model.demo then
+                ( { model | tagSettings = updatedTagSettings, view = LoadedTasksView (TagSettingsView Nothing) }, Cmd.none )
+
+            else
+                ( model, updateTags (Encode.list Encode.string (BitFlags.serialize updatedTagSettings)) )
 
 
 type EditTaskMsg
@@ -1249,6 +1217,7 @@ type EditTaskMsg
     | ChangedTagSearchBox (SearchBox.ChangeEvent String)
     | Cancel
     | Save
+    | TaskUpdated Decode.Value
 
 
 updateEditedTask : EditTaskMsg -> Model -> ( Model, Cmd Msg )
@@ -1290,7 +1259,7 @@ updateEditedTask editTaskMsg model =
                     in
                     if originalTask /= editedTask then
                         if isPresent model.demo then
-                            update (TaskUpdated (lunarTaskEncoder editedTask))
+                            update (EditTaskEffect <| TaskUpdated (lunarTaskEncoder editedTask))
                                 { model
                                     | editedTask = Nothing
                                     , view = LoadedTasksView (MainTasksView Normal)
@@ -1559,6 +1528,49 @@ updateEditedTask editTaskMsg model =
                       }
                     , Cmd.none
                     )
+
+        TaskUpdated jsonTask ->
+            let
+                -- delay fn from https://stackoverflow.com/a/61324383
+                delay time delayMsg =
+                    -- create a task that sleeps for `time`
+                    Process.sleep time
+                        |> -- once the sleep is over, ignore its output (using `always`)
+                           -- and then we create a new task that simply returns a success, and the msg
+                           Task.andThen (always <| Task.succeed delayMsg)
+                        |> -- finally, we ask Elm to perform the Task, which
+                           -- takes the result of the above task and
+                           -- returns it to our update function
+                           Task.perform identity
+            in
+            case Decode.decodeValue lunarTaskDecoder jsonTask of
+                Ok task ->
+                    let
+                        tasks =
+                            insertOrUpdateTask task model.tasks
+
+                        modelWithUpdatedTask =
+                            { model | tasks = tasks }
+                    in
+                    ( { modelWithUpdatedTask
+                        | banner = "task \"" ++ task.title ++ "\" -- id  " ++ task.id ++ " touched by db"
+                      }
+                    , Cmd.batch
+                        [ delay 5000 ClearBanner
+
+                        -- event for incrementing demo id
+                        , Task.perform DemoIdTick Time.now
+
+                        -- report new state of task list to backend
+                        , updateCacheDigest modelWithUpdatedTask <| generateCacheDigest tasks modelWithUpdatedTask
+
+                        -- update localStore
+                        , localStoreAction ( "set", localStoreEncoder modelWithUpdatedTask )
+                        ]
+                    )
+
+                Err err ->
+                    ( { model | banner = Decode.errorToString err }, Cmd.none )
 
 
 type SavedViewMsg
@@ -1899,7 +1911,8 @@ view model =
                     viewTasksJson model
 
                 LoadedTasksView (TagSettingsView maybeSelectedTag) ->
-                    viewTagSettings maybeSelectedTag model
+                    Element.map TagEffect <|
+                        viewTagSettings maybeSelectedTag model
     in
     { title = "LunarTasks"
     , body = [ viewLayout model innerContent ]
@@ -1922,7 +1935,7 @@ toggleNoteEdit viewState =
             viewState
 
 
-viewTagSettings : Maybe String -> Model -> Element Msg
+viewTagSettings : Maybe String -> Model -> Element TagMsg
 viewTagSettings maybeSelectedTag model =
     let
         remainingTasksWithTag : List LunarTask -> String -> Bool
@@ -1933,14 +1946,14 @@ viewTagSettings maybeSelectedTag model =
             in
             List.any (\t -> tagMatch t.bitTags) tasks
 
-        populateRows : Maybe String -> List (Html Msg)
+        populateRows : Maybe String -> List (Html TagMsg)
         populateRows maybeTag =
             case maybeTag of
                 Just tag ->
                     List.map
                         (\tagName ->
                             let
-                                tagNameTd : Html Msg
+                                tagNameTd : Html TagMsg
                                 tagNameTd =
                                     if tag == tagName then
                                         td []
@@ -1995,7 +2008,7 @@ viewTagSettings maybeSelectedTag model =
                     List.map
                         (\tagName ->
                             let
-                                tagNameTd : Html Msg
+                                tagNameTd : Html TagMsg
                                 tagNameTd =
                                     td
                                         [ Html.Attributes.class "embolden"
@@ -2625,6 +2638,7 @@ viewTaskDiscovery model =
             else
                 Unselected
 
+        tagSettingsBtn : Element TagMsg
         tagSettingsBtn =
             Icon.settings
                 |> Icon.withSize 2
@@ -2638,6 +2652,7 @@ viewTaskDiscovery model =
         allTags =
             BitFlags.allFlags model.tagSettings
 
+        tagsRow : Element TagMsg
         tagsRow =
             if not model.tagResourcesLoaded then
                 Element.none
@@ -2703,7 +2718,7 @@ viewTaskDiscovery model =
             [ searchTermInput
             , clearSearchBtn
             ]
-        , tagsRow
+        , Element.map TagEffect tagsRow
         , savedViewsRow
         , resetRow
         ]
@@ -2899,7 +2914,7 @@ type TagToggleState
     | Unselected
 
 
-viewTagButton : TagToggleState -> String -> Element Msg
+viewTagButton : TagToggleState -> String -> Element TagMsg
 viewTagButton tagToggleState tag =
     let
         baseButtonAttrs =
