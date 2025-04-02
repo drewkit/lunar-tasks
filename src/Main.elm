@@ -260,7 +260,7 @@ datePickerSettings =
     }
 
 
-savedViewDropdownConfig : Dropdown.Config SavedView Msg Model
+savedViewDropdownConfig : Dropdown.Config SavedView SavedViewMsg Model
 savedViewDropdownConfig =
     let
         itemToTitle item =
@@ -445,7 +445,7 @@ type Msg
     | NoOp
 
 
-maybeUpdateQueryParams : ( Model, List (Cmd Msg) ) -> ( Model, List (Cmd Msg) )
+maybeUpdateQueryParams : ( Model, List (Cmd msg) ) -> ( Model, List (Cmd msg) )
 maybeUpdateQueryParams ( m, lc ) =
     -- if the dependent resources are loaded and we have yet to perform an initial load of query params,
     -- go ahead and perform the initial load, then repeat function to proceed with query param update
@@ -488,6 +488,16 @@ maybeUpdateQueryParams ( m, lc ) =
         ( m, lc )
 
 
+updateCacheDigest : Model -> String -> Cmd msg
+updateCacheDigest model newDigest =
+    userActions ( "updateCacheDigest", model.taskOwner, Encode.string newDigest )
+
+
+batchCmdList : ( Model, List (Cmd msg) ) -> ( Model, Cmd msg )
+batchCmdList ( m, lc ) =
+    ( m, Cmd.batch lc )
+
+
 update : Msg -> Model -> ( Model, Cmd Msg )
 update msg rawModel =
     let
@@ -504,10 +514,10 @@ update msg rawModel =
                     case loadedTasksViewType of
                         MainTasksView EditSavedViewTitle ->
                             case msg of
-                                SavedViewUpdateTitle ->
+                                SavedViewEffect SavedViewUpdateTitle ->
                                     m
 
-                                SavedViewUpdateTitleInput _ ->
+                                SavedViewEffect (SavedViewUpdateTitleInput _) ->
                                     m
 
                                 ProcessDownKeys _ ->
@@ -541,14 +551,6 @@ update msg rawModel =
         fetchUserData : Cmd msg
         fetchUserData =
             userActions ( "fetchUserData", model.taskOwner, Encode.null )
-
-        updateSavedViews : Encode.Value -> Cmd msg
-        updateSavedViews encodedSavedViews =
-            userActions ( "updateSavedViews", model.taskOwner, encodedSavedViews )
-
-        updateCacheDigest : String -> Cmd msg
-        updateCacheDigest newDigest =
-            userActions ( "updateCacheDigest", model.taskOwner, Encode.string newDigest )
 
         -- UPDATE HELPERS WITH RAILWAY PATTERN
         adjustDate : ( Model, List (Cmd Msg) ) -> ( Model, List (Cmd Msg) )
@@ -684,10 +686,6 @@ update msg rawModel =
 
             else
                 ( m, lc )
-
-        batchCmdList : ( Model, List (Cmd Msg) ) -> ( Model, Cmd Msg )
-        batchCmdList ( m, lc ) =
-            ( m, Cmd.batch lc )
     in
     case msg of
         Recv data ->
@@ -840,7 +838,7 @@ update msg rawModel =
             )
                 |> processTags encodedUserData
                 |> processSavedViews encodedUserData
-                |> (\( m, lc ) -> ( m, updateCacheDigest (generateCacheDigest m.tasks m) :: lc ))
+                |> (\( m, lc ) -> ( m, updateCacheDigest m (generateCacheDigest m.tasks m) :: lc ))
                 |> processCacheDigest encodedUserData
                 |> maybeUpdateQueryParams
                 |> batchCmdList
@@ -890,7 +888,14 @@ update msg rawModel =
                 |> batchCmdList
 
         SavedViewEffect savedViewMsg ->
-            updateSavedView savedViewMsg model
+            let
+                ( updatedModel, updatedMsg ) =
+                    updateSavedView savedViewMsg model
+
+                mappedMsg =
+                    Cmd.map (\themsg -> SavedViewEffect themsg) updatedMsg
+            in
+            ( updatedModel, mappedMsg )
 
         VisibilityChanged visibility ->
             case visibility of
@@ -915,7 +920,7 @@ update msg rawModel =
                     ( modelWithTaskRemoved
                     , Cmd.batch
                         [ -- report new state of task list to backend
-                          updateCacheDigest (generateCacheDigest tasks modelWithTaskRemoved)
+                          updateCacheDigest modelWithTaskRemoved (generateCacheDigest tasks modelWithTaskRemoved)
                         , -- update localStore
                           localStoreAction ( "set", localStoreEncoder modelWithTaskRemoved )
                         ]
@@ -957,7 +962,7 @@ update msg rawModel =
                         , Task.perform DemoIdTick Time.now
 
                         -- report new state of task list to backend
-                        , updateCacheDigest <| generateCacheDigest tasks modelWithUpdatedTask
+                        , updateCacheDigest modelWithUpdatedTask <| generateCacheDigest tasks modelWithUpdatedTask
 
                         -- update localStore
                         , localStoreAction ( "set", localStoreEncoder modelWithUpdatedTask )
@@ -1567,8 +1572,13 @@ type SavedViewMsg
     | SavedViewUpdated Decode.Value
 
 
-updateSavedView : SavedViewMsg -> Model -> ( Model, Cmd Msg )
+updateSavedView : SavedViewMsg -> Model -> ( Model, Cmd SavedViewMsg )
 updateSavedView savedViewMsg model =
+    let
+        updateSavedViews : Encode.Value -> Cmd msg
+        updateSavedViews encodedSavedViews =
+            userActions ( "updateSavedViews", model.taskOwner, encodedSavedViews )
+    in
     case savedViewMsg of
         SavedViewAdd ->
             let
@@ -1698,7 +1708,7 @@ updateSavedView savedViewMsg model =
                     in
                     ( modelWithLoadedSavedViews
                     , [ localStoreAction ( "set", localStoreEncoder modelWithLoadedSavedViews )
-                      , updateCacheDigest (generateCacheDigest modelWithLoadedSavedViews.tasks modelWithLoadedSavedViews)
+                      , updateCacheDigest modelWithLoadedSavedViews (generateCacheDigest modelWithLoadedSavedViews.tasks modelWithLoadedSavedViews)
                       ]
                     )
                         |> maybeUpdateQueryParams
@@ -2664,22 +2674,23 @@ viewTaskDiscovery model =
                                         [ Html.Attributes.type_ "text"
                                         , Html.Attributes.placeholder "Saved View Title"
                                         , Html.Attributes.value model.savedViewTitleInput
-                                        , Html.Events.onInput SavedViewUpdateTitleInput
+                                        , Html.Events.onInput (\x -> SavedViewEffect <| SavedViewUpdateTitleInput x)
                                         ]
                                         []
-                                    , Icon.plusCircle |> Icon.toHtml [ Html.Events.onClick SavedViewUpdateTitle ]
+                                    , Icon.plusCircle |> Icon.toHtml [ Html.Events.onClick <| SavedViewEffect SavedViewUpdateTitle ]
                                     ]
 
                 _ ->
-                    row [] [ row [ Border.width 1 ] [ savedViewDropdown ], saveViewBtn ]
+                    Element.map (\x -> SavedViewEffect x) <|
+                        row [] [ row [ Border.width 1 ] [ savedViewDropdown ], saveViewBtn ]
 
         resetRow =
             row
                 [ transparent currentViewisDefaultView
                 ]
                 [ el
-                    [ onClick (SavedViewSelection <| Just defaultSavedView)
-                    , pointer
+                    [ pointer
+                    , onClick (SavedViewEffect <| SavedViewSelection <| Just defaultSavedView)
                     ]
                   <|
                     text "(x) reset all selections"
