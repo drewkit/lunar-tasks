@@ -67,7 +67,7 @@ suite =
                                 currentView { testModel | searchTerm = Just "wash" }
 
                             ( testModelOne, _ ) =
-                                update SavedViewAdd
+                                update (SavedViewEffect SavedViewAdd)
                                     { testModel
                                         | savedViews = [ savedView ]
                                         , searchTerm = Just "wash"
@@ -76,7 +76,7 @@ suite =
                                     }
 
                             ( testModelTwo, _ ) =
-                                update SavedViewUpdateTitle { testModelOne | savedViewTitleInput = "wash (1)" }
+                                update (SavedViewEffect SavedViewUpdateTitle) { testModelOne | savedViewTitleInput = "wash (1)" }
                         in
                         case List.head testModelTwo.savedViews of
                             Nothing ->
