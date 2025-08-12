@@ -1769,17 +1769,8 @@ loginlogoutButton viewType =
         loginButton =
             row rowSpecs
                 [ button
-                    [ width (fill |> minimum 200)
-                    , paddingEach { top = 4, bottom = 4, left = 0, right = 4 }
-                    ]
-                    { label =
-                        row buttonAttrs
-                            [ image []
-                                { src = "/images/btn_google_light_normal_ios.svg"
-                                , description = "google login"
-                                }
-                            , text "Sign in with Google"
-                            ]
+                    buttonAttrs
+                    { label = text "Sign in with Google"
                     , onPress = Just (LoginUser 0)
                     }
                 , button
