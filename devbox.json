@@ -5,7 +5,8 @@
     "elmPackages.elm-doc-preview@latest",
     "elmPackages.elm-format@latest",
     "elmPackages.elm-test@latest",
-    "elmPackages.elm-live@latest"
+    "elmPackages.elm-live@latest",
+    "lunarvim@latest"
   ],
   "shell": {
     "init_hook": [

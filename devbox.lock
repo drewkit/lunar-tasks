@@ -260,6 +260,54 @@
     "github:NixOS/nixpkgs/nixpkgs-unstable": {
       "last_modified": "2025-08-04T20:54:38Z",
       "resolved": "github:NixOS/nixpkgs/cab778239e705082fe97bb4990e0d24c50924c04?lastModified=1754340878&narHash=sha256-lgmUyVQL9tSnvvIvBp7x1euhkkCho7n3TMzgjdvgPoU%3D"
+    },
+    "lunarvim@latest": {
+      "last_modified": "2025-08-08T08:05:48Z",
+      "resolved": "github:NixOS/nixpkgs/a3f3e3f2c983e957af6b07a1db98bafd1f87b7a1#lunarvim",
+      "source": "devbox-search",
+      "version": "1.4.0",
+      "systems": {
+        "aarch64-darwin": {
+          "outputs": [
+            {
+              "name": "out",
+              "path": "/nix/store/3g0s0lf96p294xy508al4657myyrmkim-lunarvim-1.4.0",
+              "default": true
+            }
+          ],
+          "store_path": "/nix/store/3g0s0lf96p294xy508al4657myyrmkim-lunarvim-1.4.0"
+        },
+        "aarch64-linux": {
+          "outputs": [
+            {
+              "name": "out",
+              "path": "/nix/store/jyb5pm5fw21h0yav80i1z1k14m33zp55-lunarvim-1.4.0",
+              "default": true
+            }
+          ],
+          "store_path": "/nix/store/jyb5pm5fw21h0yav80i1z1k14m33zp55-lunarvim-1.4.0"
+        },
+        "x86_64-darwin": {
+          "outputs": [
+            {
+              "name": "out",
+              "path": "/nix/store/i6nrddavw06hmwbzlkg6rz1b32fh3vff-lunarvim-1.4.0",
+              "default": true
+            }
+          ],
+          "store_path": "/nix/store/i6nrddavw06hmwbzlkg6rz1b32fh3vff-lunarvim-1.4.0"
+        },
+        "x86_64-linux": {
+          "outputs": [
+            {
+              "name": "out",
+              "path": "/nix/store/y53jfqb3m42njq4vlbdf4an0carwmc0v-lunarvim-1.4.0",
+              "default": true
+            }
+          ],
+          "store_path": "/nix/store/y53jfqb3m42njq4vlbdf4an0carwmc0v-lunarvim-1.4.0"
+        }
+      }
     }
   }
 }
