@@ -13,7 +13,7 @@ import Element.Background as Background
 import Element.Border as Border
 import Element.Events exposing (onClick, onMouseEnter)
 import Element.Font as Font
-import Element.Input as Input exposing (Label, OptionState(..), button)
+import Element.Input as Input exposing (Label, OptionState(..), button, placeholder)
 import FeatherIcons as Icon exposing (Icon, key)
 import Html exposing (Html, td, th, tr)
 import Html.Attributes exposing (style, type_, value)
@@ -2109,7 +2109,7 @@ viewTask model editingNotes =
                         , onChange = \x -> EditTaskEffect (UpdateEditTaskNotes x)
                         , text = notes
                         , spellcheck = True
-                        , placeholder = Nothing
+                        , placeholder = Just <| Input.placeholder [] (text "***markdown supported***")
                         }
 
                 renderedField =
