@@ -137,6 +137,7 @@ type alias EditingNotes =
 type MainTaskViewModes
     = Normal
     | EditSavedViewTitle
+    | ConfirmTaskDelete LunarTask
 
 
 type LoadedTasksViewState
@@ -419,6 +420,7 @@ type Msg
     | NewTaskEffect NewTaskMsg
     | EditTaskEffect EditTaskMsg
     | SavedViewEffect SavedViewMsg
+    | ConfirmTaskDeletion LunarTask
     | DeleteTask LunarTask
     | ProcessDownKeys Keyboard.RawKey
     | AdjustTimeZone Time.Zone
@@ -796,6 +798,13 @@ update msg rawModel =
 
         EditTaskEffect editTaskMsg ->
             updateEditedTask editTaskMsg model
+
+        ConfirmTaskDeletion task ->
+            ( { model
+                | view = LoadedTasksView (MainTasksView (ConfirmTaskDelete task))
+              }
+            , Cmd.none
+            )
 
         DeleteTask task ->
             let
@@ -2745,7 +2754,7 @@ viewMain model =
                     text "No Tasks Found"
 
             else
-                viewTaskTable model.currentDate tasks
+                viewTaskTable model.view model.currentDate tasks
     in
     Element.column [ spacingXY 0 30, paddingXY 40 20, width fill ]
         [ viewNewTask model
@@ -2785,8 +2794,8 @@ color =
     }
 
 
-viewTaskTable : Date -> List LunarTask -> Element Msg
-viewTaskTable currentDate tasks =
+viewTaskTable : ViewState -> Date -> List LunarTask -> Element Msg
+viewTaskTable viewState currentDate tasks =
     let
         periodsLapsedMessage : Date.Date -> LunarTask -> String
         periodsLapsedMessage date task =
@@ -2807,6 +2816,15 @@ viewTaskTable currentDate tasks =
             List.map
                 (\task ->
                     let
+                        taskTitleTd =
+                            td
+                                [ Html.Attributes.style "cursor" "pointer"
+                                , Html.Events.onClick (EditTaskEffect (EditTask task.id))
+                                , Html.Attributes.class "embolden"
+                                , Html.Attributes.title task.notes
+                                ]
+                                [ Html.text task.title ]
+
                         pastDueTask =
                             pastDue currentDate task
 
@@ -2832,50 +2850,112 @@ viewTaskTable currentDate tasks =
                                         ("This task will be past due again on " ++ Date.toIsoString (getNextPastDueDate task))
                                     ]
                                     [ Html.text <| Date.toIsoString (getLastCompletedAt task) ]
+
+                        markTaskCompletedTd =
+                            td
+                                [ Html.Attributes.style "cursor" "pointer"
+                                , Html.Attributes.style "text-align" "center"
+                                , Html.Attributes.class "embolden"
+                                , Html.Events.onClick (MarkTaskCompleted task currentDate)
+                                ]
+                                [ Html.div
+                                    [ Html.Attributes.class "selective-icon-opts"
+                                    , Html.Attributes.class "selective-icon-opts-checkbox"
+                                    , Html.Attributes.title "Mark Task Completed"
+                                    ]
+                                    [ Html.div [ Html.Attributes.class "selective-icon-activated" ] [ Icon.checkSquare |> Icon.toHtml [] ]
+                                    , Html.div [ Html.Attributes.class "selective-icon-inactivated" ] [ Icon.square |> Icon.toHtml [] ]
+                                    ]
+                                ]
+
+                        taskDeletionTd =
+                            td
+                                [ Html.Attributes.style "cursor" "pointer"
+                                , Html.Attributes.style "text-align" "center"
+                                , Html.Attributes.class "embolden"
+                                , Html.Events.onClick (ConfirmTaskDeletion task)
+                                ]
+                                [ Html.div
+                                    [ Html.Attributes.class "selective-icon-opts"
+                                    , Html.Attributes.class "selective-icon-opts-checkbox"
+                                    , Html.Attributes.title "Delete Task"
+                                    ]
+                                    [ Html.div [ Html.Attributes.class "selective-icon-activated" ] [ Icon.trash2 |> Icon.toHtml [] ]
+                                    , Html.div [ Html.Attributes.class "selective-icon-inactivated" ] [ Icon.trash |> Icon.toHtml [] ]
+                                    ]
+                                ]
+
+                        taskDeleteConfirmationTd =
+                            td
+                                [ Html.Attributes.style "cursor" "pointer"
+                                , Html.Attributes.style "text-align" "center"
+                                , Html.Attributes.class "embolden"
+                                , Html.Events.onClick (DeleteTask task)
+                                ]
+                                [ Html.div
+                                    [ Html.Attributes.class "selective-icon-opts"
+                                    , Html.Attributes.class "selective-icon-opts-checkbox"
+                                    , Html.Attributes.title "Confirm Task Deletion"
+                                    ]
+                                    [ Html.div [ Html.Attributes.class "selective-icon-activated" ] [ Icon.trash2 |> Icon.toHtml [] ]
+                                    , Html.div [ Html.Attributes.class "selective-icon-inactivated" ] [ Icon.trash |> Icon.toHtml [] ]
+                                    ]
+                                ]
+
+                        abortDeleteConfirmationTd =
+                            td
+                                [ Html.Attributes.style "cursor" "pointer"
+                                , Html.Attributes.style "text-align" "center"
+                                , Html.Attributes.class "embolden"
+                                , Html.Events.onClick ReturnToMain
+                                ]
+                                [ Html.div
+                                    [ Html.Attributes.class "selective-icon-opts"
+                                    , Html.Attributes.class "selective-icon-opts-checkbox"
+                                    , Html.Attributes.title "Abort Task Deletion"
+                                    ]
+                                    [ Html.div [ Html.Attributes.class "selective-icon-activated" ] [ Icon.skipBack |> Icon.toHtml [] ]
+                                    , Html.div [ Html.Attributes.class "selective-icon-inactivated" ] [ Icon.square |> Icon.toHtml [] ]
+                                    ]
+                                ]
+
+                        regularRow =
+                            tr []
+                                [ taskTitleTd
+                                , pastDueTd
+                                , td []
+                                    [ Html.text <| String.fromInt task.period ]
+                                , lastCompletedTd
+                                , markTaskCompletedTd
+                                , taskDeletionTd
+                                ]
+
+                        confirmDeleteRow =
+                            tr
+                                [ Html.Attributes.style "background-color" "lightgray"
+                                ]
+                                [ td
+                                    [ Html.Attributes.class "embolden"
+                                    ]
+                                    [ Html.text <| "*CONFIRM DELETION* " ++ task.title ]
+                                , pastDueTd
+                                , td []
+                                    [ Html.text <| String.fromInt task.period ]
+                                , lastCompletedTd
+                                , taskDeleteConfirmationTd
+                                , abortDeleteConfirmationTd
+                                ]
                     in
-                    tr []
-                        [ td
-                            [ Html.Attributes.style "cursor" "pointer"
-                            , Html.Events.onClick (EditTaskEffect (EditTask task.id))
-                            , Html.Attributes.class "embolden"
-                            , Html.Attributes.title task.notes
-                            ]
-                            [ Html.text task.title ]
-                        , pastDueTd
-                        , td []
-                            [ Html.text <| String.fromInt task.period ]
-                        , lastCompletedTd
-                        , td
-                            [ Html.Attributes.style "cursor" "pointer"
-                            , Html.Attributes.style "text-align" "center"
-                            , Html.Attributes.class "embolden"
-                            , Html.Events.onClick (MarkTaskCompleted task currentDate)
-                            ]
-                            [ Html.div
-                                [ Html.Attributes.class "selective-icon-opts"
-                                , Html.Attributes.class "selective-icon-opts-checkbox"
-                                , Html.Attributes.title "Mark Task Completed"
-                                ]
-                                [ Html.div [ Html.Attributes.class "selective-icon-activated" ] [ Icon.checkSquare |> Icon.toHtml [] ]
-                                , Html.div [ Html.Attributes.class "selective-icon-inactivated" ] [ Icon.square |> Icon.toHtml [] ]
-                                ]
-                            ]
-                        , td
-                            [ Html.Attributes.style "cursor" "pointer"
-                            , Html.Attributes.style "text-align" "center"
-                            , Html.Attributes.class "embolden"
-                            , Html.Events.onClick (DeleteTask task)
-                            ]
-                            [ Html.div
-                                [ Html.Attributes.class "selective-icon-opts"
-                                , Html.Attributes.class "selective-icon-opts-checkbox"
-                                , Html.Attributes.title "Delete Task"
-                                ]
-                                [ Html.div [ Html.Attributes.class "selective-icon-activated" ] [ Icon.trash2 |> Icon.toHtml [] ]
-                                , Html.div [ Html.Attributes.class "selective-icon-inactivated" ] [ Icon.trash |> Icon.toHtml [] ]
-                                ]
-                            ]
-                        ]
+                    case viewState of
+                        LoadedTasksView (MainTasksView (ConfirmTaskDelete taskToConfirm)) ->
+                            if task.id == taskToConfirm.id then
+                                confirmDeleteRow
+
+                            else
+                                regularRow
+
+                        _ ->
+                            regularRow
                 )
                 data
     in
