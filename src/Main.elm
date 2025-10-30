@@ -2885,6 +2885,40 @@ viewTaskTable viewState currentDate tasks =
                                     ]
                                 ]
 
+                        taskDeleteConfirmationTd =
+                            td
+                                [ Html.Attributes.style "cursor" "pointer"
+                                , Html.Attributes.style "text-align" "center"
+                                , Html.Attributes.class "embolden"
+                                , Html.Events.onClick (DeleteTask task)
+                                ]
+                                [ Html.div
+                                    [ Html.Attributes.class "selective-icon-opts"
+                                    , Html.Attributes.class "selective-icon-opts-checkbox"
+                                    , Html.Attributes.title "Confirm Task Deletion"
+                                    ]
+                                    [ Html.div [ Html.Attributes.class "selective-icon-activated" ] [ Icon.trash2 |> Icon.toHtml [] ]
+                                    , Html.div [ Html.Attributes.class "selective-icon-inactivated" ] [ Icon.trash |> Icon.toHtml [] ]
+                                    ]
+                                ]
+
+                        abortDeleteConfirmationTd =
+                            td
+                                [ Html.Attributes.style "cursor" "pointer"
+                                , Html.Attributes.style "text-align" "center"
+                                , Html.Attributes.class "embolden"
+                                , Html.Events.onClick ReturnToMain
+                                ]
+                                [ Html.div
+                                    [ Html.Attributes.class "selective-icon-opts"
+                                    , Html.Attributes.class "selective-icon-opts-checkbox"
+                                    , Html.Attributes.title "Abort Task Deletion"
+                                    ]
+                                    [ Html.div [ Html.Attributes.class "selective-icon-activated" ] [ Icon.skipBack |> Icon.toHtml [] ]
+                                    , Html.div [ Html.Attributes.class "selective-icon-inactivated" ] [ Icon.square |> Icon.toHtml [] ]
+                                    ]
+                                ]
+
                         regularRow =
                             tr []
                                 [ taskTitleTd
@@ -2897,14 +2931,19 @@ viewTaskTable viewState currentDate tasks =
                                 ]
 
                         confirmDeleteRow =
-                            tr []
-                                [ taskTitleTd
+                            tr
+                                [ Html.Attributes.style "background-color" "lightgray"
+                                ]
+                                [ td
+                                    [ Html.Attributes.class "embolden"
+                                    ]
+                                    [ Html.text <| "*CONFIRM DELETION* " ++ task.title ]
                                 , pastDueTd
                                 , td []
                                     [ Html.text <| String.fromInt task.period ]
                                 , lastCompletedTd
-                                , markTaskCompletedTd
-                                , taskDeletionTd
+                                , taskDeleteConfirmationTd
+                                , abortDeleteConfirmationTd
                                 ]
                     in
                     case viewState of
