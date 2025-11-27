@@ -437,6 +437,7 @@ type Msg
     | ReturnToMain
     | UrlRequest Browser.UrlRequest
     | UrlChanged Url
+    | EscapeKeyPressed
     | NoOp
 
 
@@ -997,7 +998,7 @@ update msg rawModel =
         ProcessDownKeys rawKey ->
             case Keyboard.anyKeyOriginal rawKey of
                 Just Escape ->
-                    update ClearSearch model
+                    update EscapeKeyPressed model
 
                 _ ->
                     ( model, Cmd.none )
@@ -1056,6 +1057,31 @@ update msg rawModel =
 
                 LoadedTasksView _ ->
                     ( { model | view = LoadedTasksView (MainTasksView Normal) }, Cmd.none )
+
+        EscapeKeyPressed ->
+            case model.view of
+                LoginPromptView ->
+                    ( model, Cmd.none )
+
+                LoadingTasksView ->
+                    ( model, Cmd.none )
+
+                LoadingTasksFailureView ->
+                    ( model, Cmd.none )
+
+                LoadedTasksView loadedTasksView ->
+                    case loadedTasksView of
+                        EditTaskView _ ->
+                            update ReturnToMain model
+
+                        MainTasksView _ ->
+                            update ClearSearch model
+
+                        JsonExportView ->
+                            ( model, Cmd.none )
+
+                        TagSettingsView _ ->
+                            ( model, Cmd.none )
 
         NoOp ->
             ( model, Cmd.none )
