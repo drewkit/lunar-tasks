@@ -3006,16 +3006,66 @@ viewTaskTable viewState currentDate tasks =
                 )
                 data
     in
-    column [ Element.explain Debug.todo, width fill ] <|
-        row [ width fill ]
-            [ el rowAttrs <| text "Task"
-            , el rowAttrs <| text "Days Past Due"
-            , el rowAttrs <| text "Cadence"
-            , el rowAttrs <| text "Last Completed"
-            , el rowAttrs <| Element.none
-            , el rowAttrs <| Element.none
+    Element.table
+        [ Border.solid
+        , Border.width 1
+        , spacingXY 20 5
+        , paddingXY 10 5
+        , htmlAttribute <| Html.Attributes.id "task-table-body"
+        ]
+        { data = tasks
+        , columns =
+            [ { header = el [ Font.bold ] <| text "Task"
+              , width = fillPortion 12
+              , view =
+                    \task ->
+                        el
+                            [ pointer
+                            , Element.Events.onClick (EditTaskEffect (EditTask task.id))
+                            , htmlAttribute <| Html.Attributes.class "embolden"
+                            , htmlAttribute <| Html.Attributes.title task.notes
+
+                            -- , htmlAttribute <| Html.Attributes.id task.id
+                            ]
+                        <|
+                            text task.title
+              }
+            , { header = el [ Font.bold ] <| text "Days Past Due"
+              , width = fill
+              , view =
+                    \task ->
+                        if pastDue currentDate task then
+                            text <| String.fromInt <| getDaysPastDue currentDate task
+
+                        else
+                            Element.none
+              }
+            , { header = el [ Font.bold ] <| text "Cadence"
+              , width = fill
+              , view =
+                    \task ->
+                        text <| String.fromInt <| task.period
+              }
+            , { header = el [ Font.bold ] <| text "Last Completed"
+              , width = fill
+              , view =
+                    \task ->
+                        text <| Date.toIsoString (getLastCompletedAt task)
+              }
+            , { header = Element.none
+              , width = fill
+              , view =
+                    \task ->
+                        Element.none
+              }
+            , { header = Element.none
+              , width = fill
+              , view =
+                    \task ->
+                        Element.none
+              }
             ]
-            :: populateRows tasks
+        }
 
 
 type TagToggleState
