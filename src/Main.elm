@@ -1856,7 +1856,7 @@ viewDemoModeBanner demo =
 viewLayout : Model -> Element Msg -> Html Msg
 viewLayout model innerContent =
     layout
-        [ width fill
+        [ width <| minimum 1300 fill
         , height fill
         , Font.family
             [ Font.typeface "Times New Roman"
@@ -2852,9 +2852,17 @@ viewTaskTable viewState currentDate tasks =
 
                 _ ->
                     False
+
+        truncateTitle str =
+            if String.length str > 75 then
+                String.left 75 str ++ "..."
+
+            else
+                str
     in
     Element.table
         [ Border.solid
+        , Border.rounded 5
         , Border.width 1
         , spacingXY 20 5
         , paddingXY 10 5
@@ -2864,23 +2872,23 @@ viewTaskTable viewState currentDate tasks =
         { data = tasks
         , columns =
             [ { header = el [ Font.bold ] <| text "Task"
-              , width = fillPortion 12
+              , width = fill
               , view =
                     \task ->
                         el
                             [ pointer
-
-                            -- , clip
                             , Element.Events.onClick (EditTaskEffect (EditTask task.id))
                             , htmlAttribute <| Html.Attributes.class "embolden"
                             , htmlAttribute <| Html.Attributes.class "task-title"
                             , htmlAttribute <| Html.Attributes.title task.notes
+                            , clip
                             ]
                         <|
-                            text task.title
+                            text <|
+                                truncateTitle task.title
               }
             , { header = el [ Font.bold ] <| text "Days Past Due"
-              , width = fill
+              , width = shrink
               , view =
                     \task ->
                         if pastDue currentDate task then
@@ -2890,13 +2898,13 @@ viewTaskTable viewState currentDate tasks =
                             Element.none
               }
             , { header = el [ Font.bold ] <| text "Cadence"
-              , width = fill
+              , width = shrink
               , view =
                     \task ->
                         text <| String.fromInt <| task.period
               }
             , { header = el [ Font.bold ] <| text "Last Completed"
-              , width = fill
+              , width = shrink
               , view =
                     \task ->
                         text <| Date.toIsoString (getLastCompletedAt task)
@@ -2927,14 +2935,16 @@ viewTaskTable viewState currentDate tasks =
                     \task ->
                         if confirmingDeletionOfTask task then
                             generateHoverableCheckboxCell
-                                [ Element.Events.onClick ReturnToMain ]
+                                [ Element.Events.onClick ReturnToMain
+                                ]
                                 "Abort Task Deletion"
                                 Icon.square
                                 Icon.skipBack
 
                         else
                             generateHoverableCheckboxCell
-                                [ Element.Events.onClick (ConfirmTaskDeletion task) ]
+                                [ Element.Events.onClick (ConfirmTaskDeletion task)
+                                ]
                                 "Delete Task"
                                 Icon.trash
                                 Icon.trash2
