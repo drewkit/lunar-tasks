@@ -11,15 +11,15 @@ import Dropdown exposing (..)
 import Element exposing (..)
 import Element.Background as Background
 import Element.Border as Border
-import Element.Events exposing (onClick, onMouseEnter)
+import Element.Events exposing (onClick)
 import Element.Font as Font
-import Element.Input as Input exposing (Label, OptionState(..), button, placeholder)
+import Element.Input as Input exposing (OptionState(..), button)
 import FeatherIcons as Icon exposing (Icon, key)
-import Html exposing (Html, em, td, th, tr)
-import Html.Attributes exposing (style, type_, value)
-import Html.Events exposing (onMouseOver)
+import Html exposing (Html)
+import Html.Attributes exposing (style)
+import Html.Events
 import Http
-import Json.Decode as Decode exposing (Decoder, errorToString, maybe)
+import Json.Decode as Decode exposing (Decoder, errorToString)
 import Json.Encode as Encode
 import Keyboard exposing (Key(..))
 import List
