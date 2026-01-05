@@ -1999,26 +1999,30 @@ viewTagSettings maybeEditingTagName model =
                         |> Icon.toHtml [ Html.Attributes.title "tasks are still associated with this tag" ]
                         |> Element.html
             in
-            Element.table []
+            Element.table [ spacing 5 ]
                 { data = BitFlags.allFlags model.tagSettings
                 , columns =
                     [ { header = el [ Font.bold ] <| text "Tag Name"
                       , width = shrink
                       , view =
                             \tagName ->
+                                let
+                                    buttonAttrs =
+                                        [ paddingXY 4 2, Border.rounded 5, Border.width 1 ]
+                                in
                                 if matchesTagNameBeingEdited tagName then
-                                    row []
+                                    row [ spacing 5 ]
                                         [ Input.text []
                                             { onChange = UpdatedTagNameInput
                                             , text = model.tagNameInput
                                             , placeholder = Nothing
                                             , label = Input.labelHidden "tag-name"
                                             }
-                                        , Input.button []
+                                        , Input.button buttonAttrs
                                             { onPress = Just <| UpdateTag tagName
                                             , label = text "Save"
                                             }
-                                        , Input.button []
+                                        , Input.button buttonAttrs
                                             { onPress = Just <| SelectTagToEdit Nothing
                                             , label = text "Cancel"
                                             }
@@ -2031,7 +2035,10 @@ viewTagSettings maybeEditingTagName model =
                       , width = shrink
                       , view =
                             \tagName ->
-                                if remainingTasksWithTag model.tasks tagName then
+                                if matchesTagNameBeingEdited tagName then
+                                    Element.none
+
+                                else if remainingTasksWithTag model.tasks tagName then
                                     preventDeleteBox
 
                                 else
@@ -2046,7 +2053,7 @@ viewTagSettings maybeEditingTagName model =
             Just _ ->
                 Element.none
 
-            -- Not Editing a Tag Name? Include a row for creating a new tag
+            -- Not Editing a Tag Name? Include a row at the end for creating a new tag
             Nothing ->
                 row []
                     [ Input.text []
