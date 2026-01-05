@@ -1984,21 +1984,46 @@ viewTagSettings maybeEditingTagName model =
         matchesTagNameBeingEdited =
             compareTags maybeEditingTagName
 
-        tagTable =
-            let
-                allowDeleteBox item =
-                    Icon.trash2
-                        |> Icon.toHtml
-                            [ Html.Events.onClick (DeleteTag item)
-                            , Html.Attributes.style "cursor" "pointer"
-                            ]
-                        |> Element.html
+        allowDeleteBox item =
+            Icon.trash2
+                |> Icon.toHtml
+                    [ Html.Events.onClick (DeleteTag item)
+                    , Html.Attributes.style "cursor" "pointer"
+                    ]
+                |> Element.html
 
-                preventDeleteBox =
-                    Icon.alertOctagon
-                        |> Icon.toHtml [ Html.Attributes.title "tasks are still associated with this tag" ]
-                        |> Element.html
-            in
+        preventDeleteBox =
+            Icon.alertOctagon
+                |> Icon.toHtml [ Html.Attributes.title "tasks are still associated with this tag" ]
+                |> Element.html
+
+        tagLegend =
+            Element.table [ spacing 5, Border.solid, paddingXY 8 12, Border.width 1 ]
+                { data =
+                    [ { icon = Icon.trash2 |> Icon.toHtml [] |> Element.html
+                      , msg = "No tags associated with tasks, free to delete"
+                      }
+                    , { icon = preventDeleteBox
+                      , msg = "Tasks are still associated with this task"
+                      }
+                    ]
+                , columns =
+                    [ { header = el [ Font.bold ] <| text "Icon"
+                      , width = shrink
+                      , view =
+                            \i ->
+                                i.icon
+                      }
+                    , { header = el [ Font.bold ] <| text "Description"
+                      , width = shrink
+                      , view =
+                            \i ->
+                                text i.msg
+                      }
+                    ]
+                }
+
+        tagTable =
             Element.table [ spacing 5 ]
                 { data = BitFlags.allFlags model.tagSettings
                 , columns =
@@ -2048,7 +2073,7 @@ viewTagSettings maybeEditingTagName model =
                 }
     in
     column [ width fill, spacing 7, paddingXY 20 8 ]
-        [ tagTable
+        [ row [ spacing 55 ] [ tagTable, tagLegend ]
         , case maybeEditingTagName of
             Just _ ->
                 Element.none
