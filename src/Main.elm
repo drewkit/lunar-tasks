@@ -11,15 +11,15 @@ import Dropdown exposing (..)
 import Element exposing (..)
 import Element.Background as Background
 import Element.Border as Border
-import Element.Events exposing (onClick, onMouseEnter)
+import Element.Events exposing (onClick)
 import Element.Font as Font
-import Element.Input as Input exposing (Label, OptionState(..), button, placeholder)
+import Element.Input as Input exposing (OptionState(..), button)
 import FeatherIcons as Icon exposing (Icon, key)
-import Html exposing (Html, em, td, th, tr)
-import Html.Attributes exposing (style, type_, value)
-import Html.Events exposing (onMouseOver)
+import Html exposing (Html)
+import Html.Attributes exposing (style)
+import Html.Events
 import Http
-import Json.Decode as Decode exposing (Decoder, errorToString, maybe)
+import Json.Decode as Decode exposing (Decoder, errorToString)
 import Json.Encode as Encode
 import Keyboard exposing (Key(..))
 import List
@@ -1229,10 +1229,10 @@ updateTag msg model =
                     BitFlags.updateFlag oldName model.tagNameInput model.tagSettings
             in
             if isPresent model.demo then
-                ( { model | tagSettings = updatedTagSettings, view = LoadedTasksView (TagSettingsView Nothing) }, Cmd.none )
+                ( { model | tagNameInput = "", tagSettings = updatedTagSettings, view = LoadedTasksView (TagSettingsView Nothing) }, Cmd.none )
 
             else
-                ( model, updateTags (Encode.list Encode.string (BitFlags.serialize updatedTagSettings)) )
+                ( { model | tagNameInput = "" }, updateTags (Encode.list Encode.string (BitFlags.serialize updatedTagSettings)) )
 
 
 type EditTaskMsg
@@ -1856,7 +1856,7 @@ viewDemoModeBanner demo =
 viewLayout : Model -> Element Msg -> Html Msg
 viewLayout model innerContent =
     layout
-        [ width fill
+        [ width <| minimum 1300 fill
         , height fill
         , Font.family
             [ Font.typeface "Times New Roman"
@@ -1962,7 +1962,7 @@ toggleNoteEdit viewState =
 
 
 viewTagSettings : Maybe String -> Model -> Element TagMsg
-viewTagSettings maybeSelectedTag model =
+viewTagSettings maybeEditingTagName model =
     let
         remainingTasksWithTag : List LunarTask -> String -> Bool
         remainingTasksWithTag tasks tagName =
@@ -1972,150 +1972,92 @@ viewTagSettings maybeSelectedTag model =
             in
             List.any (\t -> tagMatch t.bitTags) tasks
 
-        populateRows : Maybe String -> List (Html TagMsg)
-        populateRows maybeTag =
-            case maybeTag of
-                Just tag ->
-                    List.map
-                        (\tagName ->
-                            let
-                                tagNameTd : Html TagMsg
-                                tagNameTd =
-                                    if tag == tagName then
-                                        td []
-                                            [ Html.input
-                                                [ type_ "text"
-                                                , value model.tagNameInput
-                                                , Html.Events.onInput UpdatedTagNameInput
-                                                ]
-                                                []
-                                            , Html.button [ Html.Events.onClick (UpdateTag tagName) ] [ Html.text "Save" ]
-                                            , Html.button [ Html.Events.onClick (SelectTagToEdit Nothing) ] [ Html.text "Cancel" ]
-                                            ]
-
-                                    else
-                                        td
-                                            [ Html.Attributes.class "embolden"
-                                            , Html.Events.onClick (SelectTagToEdit Nothing)
-                                            ]
-                                            [ Html.text tagName ]
-
-                                allowDeleteTd =
-                                    td
-                                        []
-                                        [ Icon.trash2
-                                            |> Icon.toHtml
-                                                [ Html.Events.onClick (DeleteTag tagName)
-                                                , Html.Attributes.style "cursor" "pointer"
-                                                ]
-                                        ]
-
-                                preventDeleteTd =
-                                    td
-                                        [ Html.Attributes.title "tasks are still associated with this tag"
-                                        ]
-                                        [ Icon.alertOctagon |> Icon.toHtml [] ]
-
-                                allowOrPreventTd =
-                                    if remainingTasksWithTag model.tasks tagName then
-                                        preventDeleteTd
-
-                                    else
-                                        allowDeleteTd
-                            in
-                            tr []
-                                [ tagNameTd
-                                , allowOrPreventTd
-                                ]
-                        )
-                        (BitFlags.allFlags model.tagSettings)
+        compareTags : Maybe String -> String -> Bool
+        compareTags mbtag currentTag =
+            case mbtag of
+                Just theSelectedTag ->
+                    theSelectedTag == currentTag
 
                 Nothing ->
-                    List.map
-                        (\tagName ->
-                            let
-                                tagNameTd : Html TagMsg
-                                tagNameTd =
-                                    td
-                                        [ Html.Attributes.class "embolden"
-                                        , Html.Events.onClick (SelectTagToEdit (Just tagName))
+                    False
+
+        matchesTagNameBeingEdited =
+            compareTags maybeEditingTagName
+
+        tagTable =
+            let
+                allowDeleteBox item =
+                    Icon.trash2
+                        |> Icon.toHtml
+                            [ Html.Events.onClick (DeleteTag item)
+                            , Html.Attributes.style "cursor" "pointer"
+                            ]
+                        |> Element.html
+
+                preventDeleteBox =
+                    Icon.alertOctagon
+                        |> Icon.toHtml [ Html.Attributes.title "tasks are still associated with this tag" ]
+                        |> Element.html
+            in
+            Element.table []
+                { data = BitFlags.allFlags model.tagSettings
+                , columns =
+                    [ { header = el [ Font.bold ] <| text "Tag Name"
+                      , width = shrink
+                      , view =
+                            \tagName ->
+                                if matchesTagNameBeingEdited tagName then
+                                    row []
+                                        [ Input.text []
+                                            { onChange = UpdatedTagNameInput
+                                            , text = model.tagNameInput
+                                            , placeholder = Nothing
+                                            , label = Input.labelHidden "tag-name"
+                                            }
+                                        , Input.button []
+                                            { onPress = Just <| UpdateTag tagName
+                                            , label = text "Save"
+                                            }
+                                        , Input.button []
+                                            { onPress = Just <| SelectTagToEdit Nothing
+                                            , label = text "Cancel"
+                                            }
                                         ]
-                                        [ Html.text tagName ]
 
-                                allowDeleteTd =
-                                    td
-                                        []
-                                        [ Icon.trash2
-                                            |> Icon.toHtml
-                                                [ Html.Events.onClick (DeleteTag tagName)
-                                                , Html.Attributes.style "cursor" "pointer"
-                                                ]
-                                        ]
+                                else
+                                    el [ Element.Events.onClick (SelectTagToEdit (Just tagName)) ] (text tagName)
+                      }
+                    , { header = Element.none
+                      , width = shrink
+                      , view =
+                            \tagName ->
+                                if remainingTasksWithTag model.tasks tagName then
+                                    preventDeleteBox
 
-                                preventDeleteTd =
-                                    td
-                                        [ Html.Attributes.title "tasks are still associated with this tag"
-                                        ]
-                                        [ Icon.alertOctagon |> Icon.toHtml [] ]
-
-                                allowOrPreventTd =
-                                    if remainingTasksWithTag model.tasks tagName then
-                                        preventDeleteTd
-
-                                    else
-                                        allowDeleteTd
-                            in
-                            tr []
-                                [ tagNameTd
-                                , allowOrPreventTd
-                                ]
-                        )
-                        (BitFlags.allFlags model.tagSettings)
+                                else
+                                    allowDeleteBox tagName
+                      }
+                    ]
+                }
     in
-    case maybeSelectedTag of
-        Just selectedTag ->
-            el [ width fill ] <|
-                Element.html <|
-                    Html.div []
-                        [ Html.table []
-                            [ Html.thead []
-                                [ tr
-                                    []
-                                    [ th
-                                        [ Html.Attributes.style "text-align" "left"
-                                        , Html.Events.onClick (SelectTagToEdit Nothing)
-                                        ]
-                                        [ Html.text "Tag Name" ]
-                                    , th [] []
-                                    ]
-                                ]
-                            , Html.tbody [ Html.Attributes.id "tag-table-body" ] (populateRows (Just selectedTag))
-                            ]
-                        ]
+    column [ width fill, spacing 7, paddingXY 20 8 ]
+        [ tagTable
+        , case maybeEditingTagName of
+            Just _ ->
+                Element.none
 
-        Nothing ->
-            el [ width fill ] <|
-                Element.html <|
-                    Html.div []
-                        [ Html.table []
-                            [ Html.thead []
-                                [ tr
-                                    []
-                                    [ th
-                                        [ Html.Attributes.style "text-align" "left"
-                                        , Html.Events.onClick (SelectTagToEdit Nothing)
-                                        ]
-                                        [ Html.text "Tag Name" ]
-                                    , th [] []
-                                    ]
-                                ]
-                            , Html.tbody [ Html.Attributes.id "tag-table-body" ] (populateRows Nothing)
-                            ]
-                        , Html.div []
-                            [ Html.input [ Html.Attributes.type_ "text", Html.Attributes.placeholder "New Tag Name", Html.Attributes.value model.tagNameInput, Html.Events.onInput UpdatedTagNameInput ] []
-                            , Icon.plusCircle |> Icon.toHtml [ Html.Events.onClick CreateTag ]
-                            ]
-                        ]
+            -- Not Editing a Tag Name? Include a row for creating a new tag
+            Nothing ->
+                row []
+                    [ Input.text []
+                        { onChange = UpdatedTagNameInput
+                        , text = model.tagNameInput
+                        , placeholder = Just <| Input.placeholder [] <| text "New Tag Name"
+                        , label = Input.labelHidden "tag name"
+                        }
+                    , Icon.plusCircle |> Icon.toHtml [ Html.Events.onClick CreateTag ] |> Element.html
+                    ]
+        ]
 
 
 viewTasksJson : Model -> Element Msg
@@ -2852,9 +2794,17 @@ viewTaskTable viewState currentDate tasks =
 
                 _ ->
                     False
+
+        truncateTitle str =
+            if String.length str > 75 then
+                String.left 75 str ++ "..."
+
+            else
+                str
     in
     Element.table
         [ Border.solid
+        , Border.rounded 5
         , Border.width 1
         , spacingXY 20 5
         , paddingXY 10 5
@@ -2864,23 +2814,23 @@ viewTaskTable viewState currentDate tasks =
         { data = tasks
         , columns =
             [ { header = el [ Font.bold ] <| text "Task"
-              , width = fillPortion 12
+              , width = fill
               , view =
                     \task ->
                         el
                             [ pointer
-
-                            -- , clip
                             , Element.Events.onClick (EditTaskEffect (EditTask task.id))
                             , htmlAttribute <| Html.Attributes.class "embolden"
                             , htmlAttribute <| Html.Attributes.class "task-title"
                             , htmlAttribute <| Html.Attributes.title task.notes
+                            , clip
                             ]
                         <|
-                            text task.title
+                            text <|
+                                truncateTitle task.title
               }
             , { header = el [ Font.bold ] <| text "Days Past Due"
-              , width = fill
+              , width = shrink
               , view =
                     \task ->
                         if pastDue currentDate task then
@@ -2890,13 +2840,13 @@ viewTaskTable viewState currentDate tasks =
                             Element.none
               }
             , { header = el [ Font.bold ] <| text "Cadence"
-              , width = fill
+              , width = shrink
               , view =
                     \task ->
                         text <| String.fromInt <| task.period
               }
             , { header = el [ Font.bold ] <| text "Last Completed"
-              , width = fill
+              , width = shrink
               , view =
                     \task ->
                         text <| Date.toIsoString (getLastCompletedAt task)
@@ -2927,14 +2877,16 @@ viewTaskTable viewState currentDate tasks =
                     \task ->
                         if confirmingDeletionOfTask task then
                             generateHoverableCheckboxCell
-                                [ Element.Events.onClick ReturnToMain ]
+                                [ Element.Events.onClick ReturnToMain
+                                ]
                                 "Abort Task Deletion"
                                 Icon.square
                                 Icon.skipBack
 
                         else
                             generateHoverableCheckboxCell
-                                [ Element.Events.onClick (ConfirmTaskDeletion task) ]
+                                [ Element.Events.onClick (ConfirmTaskDeletion task)
+                                ]
                                 "Delete Task"
                                 Icon.trash
                                 Icon.trash2

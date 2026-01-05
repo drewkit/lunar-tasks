@@ -3,7 +3,7 @@ module ListSettings exposing (..)
 import BitFlags
 import Date
 import Dict
-import Json.Decode as Decode exposing (Decoder, errorToString)
+import Json.Decode as Decode exposing (Decoder)
 import Json.Encode as Encode
 import LunarTask exposing (..)
 import Set exposing (Set)
