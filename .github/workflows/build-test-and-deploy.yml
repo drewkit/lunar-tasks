@@ -1,0 +1,51 @@
+name: Build, Test and Deploy
+
+on:
+  push:
+    branches:
+      - main
+
+jobs:
+  build-test-and-deploy:
+    runs-on: ubuntu-slim
+    steps:
+      - uses: actions/checkout@v5
+
+      - name: Cache node modules
+        id: cache-npm
+        uses: actions/cache@v4
+        env:
+          cache-name: cache-node-modules
+        with:
+          path: ~/.npm
+          key: ${{ runner.os }}-build-${{ env.cache-name }}
+
+      - if: ${{ steps.cache-npm.outputs.cache-hit != 'true' }}
+        name: List the state of node modules
+        continue-on-error: true
+        run: npm list
+
+      - name: Install dependencies
+        run: npm install -g elm elm-test uglify-js
+
+      - run: elm-test
+
+      - name: Make optimized elm file
+        run: elm make src/Main.elm --output=public/js/optimized.js --optimize
+
+      - name: Uglify JS file
+        run: uglifyjs public/js/optimized.js --compress 'pure_funcs=[F2,F3,F4,F5,F6,F7,F8,F9,A2,A3,A4,A5,A6,A7,A8,A9],pure_getters,keep_fargs=false,unsafe_comps,unsafe' | uglifyjs --mangle --output public/js/main.js
+
+      - name: Add host key
+        run: |
+          mkdir -p ~/.ssh
+          ssh-keyscan -H ${{ secrets.LUNARTASKS_IP_ADDR }} >> ~/.ssh/known_hosts
+
+      - name: Use SSH key
+        uses: webfactory/ssh-agent@v0.9.0
+        with:
+          ssh-private-key: ${{ secrets.LUNARTASKS_PRIVATE_KEY }}
+
+      - name: Perform rsync
+        run: rsync -v -r -e ssh ./public/* root@${{ secrets.LUNARTASKS_IP_ADDR }}:/root/lunartasks_pb/pb_public
+        

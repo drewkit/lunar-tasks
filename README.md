@@ -1,6 +1,6 @@
 # lunar-tasks
 
-[![Codeship Status for drewkit/lunar-tasks](https://app.codeship.com/projects/58324a06-f4d1-427b-9139-c25b8237cf96/status?branch=main)](https://app.codeship.com/projects/466130)
+[![Build and Test](https://github.com/drewkit/lunar-tasks/actions/workflows/build-and-test.yml/badge.svg)](https://github.com/drewkit/lunar-tasks/actions/workflows/build-and-test.yml)
 
 ### To Locally Run LunarTasks
 
