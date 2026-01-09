@@ -3018,8 +3018,7 @@ viewNewTaskCreateBtn model =
 
 viewNewTask : Model -> Element Msg
 viewNewTask model =
-    el [ paddingXY 3 3, Border.solid, Border.width 1, width fill ] <|
-        row [ Font.size 22, Border.width 1, spacing 25, paddingXY 15 20, width fill ]
+        row [ Font.size 22, spacing 25, paddingXY 15 20, width fill, Border.width 1, Border.rounded 5 ]
             [ Input.text []
                 { placeholder = Nothing
                 , label = Input.labelAbove [ Font.bold ] <| text "Title"
