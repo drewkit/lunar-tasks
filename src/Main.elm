@@ -1856,7 +1856,7 @@ viewDemoModeBanner demo =
 viewLayout : Model -> Element Msg -> Html Msg
 viewLayout model innerContent =
     layout
-        [ width <| minimum 1300 fill
+        [ width <| minimum 1200 fill
         , height fill
         , Font.family
             [ Font.typeface "Times New Roman"
@@ -1881,7 +1881,7 @@ viewHeader model =
             color.lightBlue
     in
     column
-        [ height <| fillPortion 2
+        [ height <| fillPortion 1
         , width fill
         ]
         [ row
@@ -2805,6 +2805,7 @@ viewTaskTable viewState currentDate tasks =
                  , Font.center
                  , htmlAttribute <| Html.Attributes.class "selective-icon-opts"
                  , htmlAttribute <| Html.Attributes.class "selective-icon-opts-checkbox"
+                 , width <| px 10
                  ]
                     ++ attrs
                 )
@@ -2838,6 +2839,7 @@ viewTaskTable viewState currentDate tasks =
         [ Border.solid
         , Border.rounded 5
         , Border.width 1
+        , width <| minimum 1200 fill
         , spacingXY 20 5
         , paddingXY 10 5
         , htmlAttribute <| Html.Attributes.id "task-table-body"
@@ -3018,37 +3020,37 @@ viewNewTaskCreateBtn model =
 
 viewNewTask : Model -> Element Msg
 viewNewTask model =
-        row [ Font.size 22, spacing 25, paddingXY 15 20, width fill, Border.width 1, Border.rounded 5 ]
-            [ Input.text []
-                { placeholder = Nothing
-                , label = Input.labelAbove [ Font.bold ] <| text "Title"
-                , text = model.newTaskTitle
-                , onChange = \x -> NewTaskEffect (UpdateNewTaskTitle x)
-                }
-            , Input.text []
-                { placeholder = Nothing
-                , label = Input.labelAbove [ Font.bold ] <| text "Cadence (in days)"
-                , text = String.fromInt model.newTaskPeriod
-                , onChange = \x -> NewTaskEffect (UpdateNewTaskPeriod x)
-                }
-            , Input.text []
-                { placeholder = Nothing
-                , label = Input.labelAbove [ Font.bold ] <| text "Notes"
-                , text = model.newTaskNotes
-                , onChange = \x -> NewTaskEffect (UpdateNewTaskNotes x)
-                }
-            , column []
-                [ el [ Font.bold, paddingXY 0 4 ] (text "Date of Last Completion")
-                , el [ Border.width 1, paddingXY 10 10, Border.color color.lightGrey ] <|
-                    (DatePicker.view (Just model.newTaskCompletedAt)
-                        datePickerSettings
-                        model.datePicker
-                        |> Html.map (\x -> NewTaskEffect (SetNewTaskDatePicker x))
-                        |> Element.html
-                    )
-                ]
-            , viewNewTaskCreateBtn model
+    row [ Font.size 22, spacing 25, paddingXY 15 20, width fill, Border.width 1, Border.rounded 5 ]
+        [ Input.text []
+            { placeholder = Nothing
+            , label = Input.labelAbove [ Font.bold ] <| text "Title"
+            , text = model.newTaskTitle
+            , onChange = \x -> NewTaskEffect (UpdateNewTaskTitle x)
+            }
+        , Input.text []
+            { placeholder = Nothing
+            , label = Input.labelAbove [ Font.bold ] <| text "Cadence (in days)"
+            , text = String.fromInt model.newTaskPeriod
+            , onChange = \x -> NewTaskEffect (UpdateNewTaskPeriod x)
+            }
+        , Input.text []
+            { placeholder = Nothing
+            , label = Input.labelAbove [ Font.bold ] <| text "Notes"
+            , text = model.newTaskNotes
+            , onChange = \x -> NewTaskEffect (UpdateNewTaskNotes x)
+            }
+        , column []
+            [ el [ Font.bold, paddingXY 0 4 ] (text "Date of Last Completion")
+            , el [ Border.width 1, paddingXY 10 10, Border.color color.lightGrey ] <|
+                (DatePicker.view (Just model.newTaskCompletedAt)
+                    datePickerSettings
+                    model.datePicker
+                    |> Html.map (\x -> NewTaskEffect (SetNewTaskDatePicker x))
+                    |> Element.html
+                )
             ]
+        , viewNewTaskCreateBtn model
+        ]
 
 
 
